@@ -6,6 +6,8 @@ class SensorManager {
             SensorType.TEMPERATURE -> "36.7"
             SensorType.WEIGHT -> "65"
             SensorType.HEART_RATE -> "72"
+            SensorType.BLOOD_PRESSURE -> "120/80"
+
             else -> ""
         }
     }
