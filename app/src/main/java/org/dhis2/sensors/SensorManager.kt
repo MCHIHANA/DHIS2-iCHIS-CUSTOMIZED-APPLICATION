@@ -5,6 +5,7 @@ class SensorManager {
         return when (type) {
             SensorType.TEMPERATURE -> "36.7"
             SensorType.WEIGHT -> "65"
+            SensorType.HEART_RATE -> "72"
             else -> ""
         }
     }
