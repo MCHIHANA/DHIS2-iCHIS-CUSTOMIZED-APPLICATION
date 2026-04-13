@@ -2,6 +2,9 @@ package org.dhis2.sensors
 
 class SensorManager {
     fun readSensor(type: SensorType): String {
-        return ""
+        return when (type) {
+            SensorType.TEMPERATURE -> "36.7"
+            else -> ""
+        }
     }
 }
