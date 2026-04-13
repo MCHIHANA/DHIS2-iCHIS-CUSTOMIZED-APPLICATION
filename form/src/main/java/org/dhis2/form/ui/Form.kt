@@ -47,6 +47,9 @@ fun Form(
     intentHandler: (FormIntent) -> Unit,
     uiEventHandler: (RecyclerViewUiEvents) -> Unit,
     resources: ResourceManager,
+    sensorStatuses: Map<String, String>,
+    isFieldScanning: Map<String, Boolean>,
+    onConnectToSensor: (String) -> Unit,
 ) {
     val scrollState = rememberLazyListState()
     val focusManager = LocalFocusManager.current
@@ -134,6 +137,9 @@ fun Form(
                                     intentHandler = intentHandler,
                                     resources = resources,
                                     focusManager = focusManager,
+                                    sensorStatus = sensorStatuses[fieldUiModel.uid],
+                                    isScanning = isFieldScanning[fieldUiModel.uid] ?: false,
+                                    onConnectToSensor = onConnectToSensor,
                                     onNextClicked = {
                                         manageOnNextEvent(
                                             focusManager,

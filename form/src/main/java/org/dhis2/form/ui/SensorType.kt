@@ -4,5 +4,7 @@ enum class SensorType {
     TEMPERATURE,
     WEIGHT,
     BLOOD_PRESSURE,
-    HEART_RATE
+    HEART_RATE,
+    SYSTOLIC,
+    DIASTOLIC
 }

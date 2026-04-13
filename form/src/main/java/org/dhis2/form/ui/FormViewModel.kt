@@ -16,7 +16,13 @@ import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.launchIn
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.onEach
+import kotlinx.coroutines.flow.update
+import org.dhis2.form.ui.sensor.SensorConnectionManager
+import org.dhis2.form.ui.SensorType
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.launch
 import org.dhis2.commons.date.DateUtils
@@ -84,6 +90,12 @@ class FormViewModel(
     private val _items = MutableLiveData<List<FieldUiModel>>()
     val items: LiveData<List<FieldUiModel>> = _items
 
+    private val _sensorStatuses = MutableStateFlow<Map<String, String>>(emptyMap())
+    val sensorStatuses: StateFlow<Map<String, String>> = _sensorStatuses.asStateFlow()
+
+    private val _isFieldScanning = MutableStateFlow<Map<String, Boolean>>(emptyMap())
+    val isFieldScanning: StateFlow<Map<String, Boolean>> = _isFieldScanning.asStateFlow()
+
     var previousActionItem: RowAction? = null
 
     private val _savedValue = MutableLiveData<RowAction>()
@@ -119,8 +131,6 @@ class FormViewModel(
         )
 
     private val handler = Handler(Looper.getMainLooper())
-
-    private val sensorManager = SensorManager()
 
     var filePath: String? = null
 
@@ -252,6 +262,7 @@ class FormViewModel(
             ActionType.ON_ADD_IMAGE_FINISHED -> handleOnAddImageFinishedAction(action)
             ActionType.ON_STORE_FILE -> handleOnStoreFileAction(action)
             ActionType.ON_FETCH_OPTIONS -> handleFetchOptionsAction(action)
+            ActionType.ON_SENSOR_SCAN -> handleOnSensorScanRequested(action)
         }
 
     private fun handleFetchOptionsAction(action: RowAction): StoreResult {
@@ -630,6 +641,14 @@ class FormViewModel(
                     value = intent.value,
                     extraData = intent.optionSetUid,
                     actionType = ActionType.ON_FETCH_OPTIONS,
+                )
+
+            is FormIntent.OnSensorScanRequested ->
+                createRowAction(
+                    uid = intent.uid,
+                    value = null,
+                    extraData = intent.connectionType,
+                    actionType = ActionType.ON_SENSOR_SCAN,
                 )
         }
 
@@ -1076,6 +1095,47 @@ class FormViewModel(
 
     fun fetchPeriods(): Flow<PagingData<Period>> = repository.fetchPeriods().flowOn(dispatcher.io())
 
+
+    private fun handleOnSensorScanRequested(action: RowAction): StoreResult {
+        val uid = action.id
+        val connectionType = action.extraData ?: "Bluetooth"
+        val field = _items.value?.find { it.uid == uid } ?: return StoreResult(uid, ValueStoreResult.VALUE_HAS_NOT_CHANGED)
+
+        _isFieldScanning.update { it + (uid to true) }
+        _sensorStatuses.update { it + (uid to "Searching...") }
+
+        viewModelScope.launch {
+            try {
+                Timber.d("Scanning via $connectionType for $uid")
+                val sensorType = when {
+                    field.label.contains("Temperature", ignoreCase = true) -> SensorType.TEMPERATURE
+                    field.label.contains("Weight", ignoreCase = true) -> SensorType.WEIGHT
+                    field.label.contains("Heart Rate", ignoreCase = true) -> SensorType.HEART_RATE
+                    field.label.contains("Systolic", ignoreCase = true) -> SensorType.SYSTOLIC
+                    field.label.contains("Diastolic", ignoreCase = true) -> SensorType.DIASTOLIC
+                    else -> SensorType.TEMPERATURE
+                }
+
+                val value = SensorConnectionManager.scan(sensorType)
+                Timber.d("Value received: $value")
+                
+                if (value != null) {
+                    _sensorStatuses.update { it + (uid to "Sensor connected") }
+                    handleOnSaveAction(action.copy(value = value, type = ActionType.ON_SAVE))
+                } else {
+                    _sensorStatuses.update { it + (uid to "Sensor not found. Enter manually.") }
+                }
+            } catch (e: Exception) {
+                Timber.e(e, "Error scanning")
+                _sensorStatuses.update { it + (uid to "Error. Enter manually.") }
+            } finally {
+                _isFieldScanning.update { it + (uid to false) }
+            }
+        }
+
+        return StoreResult(uid, ValueStoreResult.VALUE_CHANGED)
+    }
+
     /**
      * Automatically populates medical fields (Temperature, Weight, etc.) using simulated
      * sensor data if the fields are currently empty and editable.
@@ -1087,21 +1147,25 @@ class FormViewModel(
                     field.label.contains("Temperature", ignoreCase = true) -> SensorType.TEMPERATURE
                     field.label.contains("Weight", ignoreCase = true) -> SensorType.WEIGHT
                     field.label.contains("Heart Rate", ignoreCase = true) -> SensorType.HEART_RATE
-                    field.label.contains("Blood Pressure", ignoreCase = true) -> SensorType.BLOOD_PRESSURE
+                    field.label.contains("Systolic", ignoreCase = true) -> SensorType.SYSTOLIC
+                    field.label.contains("Diastolic", ignoreCase = true) -> SensorType.DIASTOLIC
                     else -> null
                 }
                 
-                sensorType?.let {
+                sensorType?.let { type ->
                     Timber.d("Auto-filling field ${field.label} using sensor")
-                    submitIntent(
-                        FormIntent.OnSave(
-                            uid = field.uid,
-                            value = sensorManager.readSensor(it),
-                            valueType = field.valueType,
-                            fieldMask = field.fieldMask,
-                            allowFutureDates = field.allowFutureDates,
-                        ),
-                    )
+                    viewModelScope.launch {
+                        val value = SensorConnectionManager.scan(type)
+                        submitIntent(
+                            FormIntent.OnSave(
+                                uid = field.uid,
+                                value = value,
+                                valueType = field.valueType,
+                                fieldMask = field.fieldMask,
+                                allowFutureDates = field.allowFutureDates,
+                            ),
+                        )
+                    }
                 }
             }
         }

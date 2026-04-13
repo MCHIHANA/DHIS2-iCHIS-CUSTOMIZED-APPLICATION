@@ -13,6 +13,7 @@ import android.view.ViewGroup
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.livedata.observeAsState
 import androidx.compose.runtime.mutableStateOf
@@ -56,6 +57,7 @@ import org.dhis2.form.ui.customintent.CustomIntentActivityResultContract
 import org.dhis2.form.ui.customintent.CustomIntentInput
 import org.dhis2.form.ui.customintent.CustomIntentResult
 import org.dhis2.form.ui.dialog.QRDetailBottomDialog
+import org.dhis2.form.ui.dialog.SensorConnectionBottomSheet
 import org.dhis2.form.ui.event.RecyclerViewUiEvents
 import org.dhis2.form.ui.intent.FormIntent
 import org.dhis2.form.ui.mapper.FormSectionMapper
@@ -199,6 +201,9 @@ class FormView : Fragment() {
                         formSectionMapper.mapFromFieldUiModelList(it)
                     } ?: emptyList()
 
+                val sensorStatuses by viewModel.sensorStatuses.collectAsState()
+                val isFieldScanning by viewModel.isFieldScanning.collectAsState()
+
                 var resultDialogData: FormViewModel.FormActions.ShowResultDialog? by remember {
                     mutableStateOf(null)
                 }
@@ -220,6 +225,11 @@ class FormView : Fragment() {
                     intentHandler = ::intentHandler,
                     uiEventHandler = ::uiEventHandler,
                     resources = Injector.provideResourcesManager(context),
+                    sensorStatuses = sensorStatuses,
+                    isFieldScanning = isFieldScanning,
+                    onConnectToSensor = { uid ->
+                        SensorConnectionBottomSheet(uid, viewModel).show(childFragmentManager)
+                    }
                 )
 
                 resultDialogData?.let {

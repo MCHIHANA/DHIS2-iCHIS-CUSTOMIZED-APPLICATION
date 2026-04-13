@@ -63,6 +63,9 @@ fun provideParameterSelectorItem(
                 intentHandler = callback::intent,
                 resources = resources,
                 focusManager = focusManager,
+                sensorStatus = null,
+                isScanning = false,
+                onConnectToSensor = {},
                 onNextClicked = onNextClicked,
                 onFileSelected = {
                     // Not supported for search

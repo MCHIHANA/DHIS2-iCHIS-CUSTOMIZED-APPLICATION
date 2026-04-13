@@ -5,14 +5,12 @@ import kotlin.random.Random
 class SensorManager {
     fun readSensor(type: SensorType): String {
         return when (type) {
-            SensorType.TEMPERATURE -> String.format("%.1f", Random.nextDouble(36.0, 39.0))
-            SensorType.WEIGHT -> String.format("%.1f", Random.nextDouble(50.0, 100.0))
-            SensorType.BLOOD_PRESSURE -> {
-                val systolic = Random.nextInt(110, 140)
-                val diastolic = Random.nextInt(70, 90)
-                "$systolic/$diastolic"
-            }
-            SensorType.HEART_RATE -> Random.nextInt(60, 100).toString()
+            SensorType.TEMPERATURE -> "36.7"
+            SensorType.WEIGHT -> "65"
+            SensorType.HEART_RATE -> "72"
+            SensorType.SYSTOLIC -> "120"
+            SensorType.DIASTOLIC -> "80"
+            SensorType.BLOOD_PRESSURE -> "120/80"
         }
     }
 }
