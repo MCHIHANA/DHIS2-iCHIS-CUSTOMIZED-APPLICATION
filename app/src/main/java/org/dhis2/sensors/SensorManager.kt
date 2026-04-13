@@ -1,5 +1,8 @@
 package org.dhis2.sensors
 
+import kotlin.random.Random
+
+
 class SensorManager {
     fun readSensor(type: SensorType): String {
         return when (type) {
