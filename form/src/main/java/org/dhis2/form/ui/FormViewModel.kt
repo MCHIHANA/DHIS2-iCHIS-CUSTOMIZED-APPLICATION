@@ -120,6 +120,8 @@ class FormViewModel(
 
     private val handler = Handler(Looper.getMainLooper())
 
+    private val sensorManager = SensorManager()
+
     var filePath: String? = null
 
     init {
@@ -1023,6 +1025,7 @@ class FormViewModel(
                 }.await()
             try {
                 _items.postValue(result)
+                autoFillMedicalFields(result)
             } catch (e: Exception) {
                 Timber.e(e)
                 _items.postValue(emptyList())
@@ -1072,6 +1075,37 @@ class FormViewModel(
         repository.reEvaluateRequestParams(customIntentUid)
 
     fun fetchPeriods(): Flow<PagingData<Period>> = repository.fetchPeriods().flowOn(dispatcher.io())
+
+    /**
+     * Automatically populates medical fields (Temperature, Weight, etc.) using simulated
+     * sensor data if the fields are currently empty and editable.
+     */
+    private fun autoFillMedicalFields(fields: List<FieldUiModel>) {
+        fields.forEach { field ->
+            if (field.value.isNullOrEmpty() && field.editable) {
+                val sensorType = when {
+                    field.label.contains("Temperature", ignoreCase = true) -> SensorType.TEMPERATURE
+                    field.label.contains("Weight", ignoreCase = true) -> SensorType.WEIGHT
+                    field.label.contains("Heart Rate", ignoreCase = true) -> SensorType.HEART_RATE
+                    field.label.contains("Blood Pressure", ignoreCase = true) -> SensorType.BLOOD_PRESSURE
+                    else -> null
+                }
+                
+                sensorType?.let {
+                    Timber.d("Auto-filling field ${field.label} using sensor")
+                    submitIntent(
+                        FormIntent.OnSave(
+                            uid = field.uid,
+                            value = sensorManager.readSensor(it),
+                            valueType = field.valueType,
+                            fieldMask = field.fieldMask,
+                            allowFutureDates = field.allowFutureDates,
+                        ),
+                    )
+                }
+            }
+        }
+    }
 
     companion object {
         const val TAG = "FormViewModel"
