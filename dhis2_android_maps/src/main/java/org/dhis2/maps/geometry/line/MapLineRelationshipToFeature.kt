@@ -1,0 +1,83 @@
+package org.dhis2.maps.geometry.line
+
+import org.dhis2.maps.geometry.areLngLatCorrect
+import org.dhis2.maps.geometry.closestPointTo
+import org.hisp.dhis.android.core.arch.helpers.GeometryHelper
+import org.hisp.dhis.android.core.common.FeatureType
+import org.hisp.dhis.android.core.common.Geometry
+import org.maplibre.geojson.Feature
+import org.maplibre.geojson.LineString
+import org.maplibre.geojson.Point
+
+class MapLineRelationshipToFeature {
+    fun map(
+        fromGeometry: Geometry,
+        toGeometry: Geometry,
+    ): Feature? {
+        val (lineStartPoint, lineEndPoint) =
+            getStartPoints(
+                fromGeometry,
+                toGeometry,
+            )
+
+        val lonLineStart = lineStartPoint[0]
+        val latLineStart = lineStartPoint[1]
+        val lonLineEnd = lineEndPoint[0]
+        val latLineEnd = lineEndPoint[1]
+
+        if (areLngLatCorrect(lonLineStart, latLineStart) &&
+            areLngLatCorrect(lonLineEnd, latLineEnd)
+        ) {
+            val firstPoint = Point.fromLngLat(lonLineStart, latLineStart)
+            val secondPoint = Point.fromLngLat(lonLineEnd, latLineEnd)
+            return Feature.fromGeometry(LineString.fromLngLats(listOf(firstPoint, secondPoint)))
+        }
+        return null
+    }
+
+    private fun getPoint(geo: Geometry): List<Double> =
+        when (geo.type()) {
+            FeatureType.POINT -> GeometryHelper.getPoint(geo)
+            FeatureType.POLYGON -> GeometryHelper.getPolygon(geo)[0][0]
+            else -> {
+                arrayListOf(0.0, 0.0)
+            }
+        }
+
+    private fun getStartPoints(
+        fromGeometry: Geometry,
+        toGeometry: Geometry,
+    ): Pair<List<Double>, List<Double>> {
+        return if (fromGeometry.type() == FeatureType.POINT &&
+            toGeometry.type() == FeatureType.POINT
+        ) {
+            Pair(GeometryHelper.getPoint(fromGeometry), GeometryHelper.getPoint(toGeometry))
+        } else if (fromGeometry.type() == FeatureType.POINT &&
+            toGeometry.type() == FeatureType.POLYGON
+        ) {
+            Pair(
+                GeometryHelper.getPoint(fromGeometry),
+                GeometryHelper
+                    .getPolygon(toGeometry)
+                    .closestPointTo(GeometryHelper.getPoint(fromGeometry)),
+            )
+        } else if (fromGeometry.type() == FeatureType.POLYGON &&
+            toGeometry.type() == FeatureType.POINT
+        ) {
+            Pair(
+                GeometryHelper
+                    .getPolygon(fromGeometry)
+                    .closestPointTo(GeometryHelper.getPoint(toGeometry)),
+                GeometryHelper.getPoint(toGeometry),
+            )
+        } else if (fromGeometry.type() == FeatureType.POLYGON &&
+            toGeometry.type() == FeatureType.POLYGON
+        ) {
+            GeometryHelper
+                .getPolygon(fromGeometry)
+                .closestPointTo(GeometryHelper.getPolygon(toGeometry))
+        } else {
+            return Pair(arrayListOf(0.0, 0.0), arrayListOf(0.0, 0.0))
+        }
+    }
+}

@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="openid_login_icon">@color/white</color>
+    <color name="openid_login_text">@color/white</color>
+    <color name="openid_login_bg">?colorPrimary</color>
+    <color name="visualization_error_icon">#F2F2F2</color>
+    <color name="chart_marker_bg_color">#607D8B</color>
+</resources>

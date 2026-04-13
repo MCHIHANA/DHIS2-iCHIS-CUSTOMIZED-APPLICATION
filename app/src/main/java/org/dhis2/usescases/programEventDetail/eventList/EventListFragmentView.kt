@@ -1,0 +1,3 @@
+package org.dhis2.usescases.programEventDetail.eventList
+
+interface EventListFragmentView
