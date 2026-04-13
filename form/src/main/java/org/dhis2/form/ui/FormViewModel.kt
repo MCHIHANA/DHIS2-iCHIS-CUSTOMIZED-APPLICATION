@@ -1108,6 +1108,16 @@ class FormViewModel(
                             allowFutureDates = field.allowFutureDates,
                         ),
                     )
+                } else if (field.label.contains("Blood Pressure", ignoreCase = true)) {
+                    submitIntent(
+                        FormIntent.OnSave(
+                            uid = field.uid,
+                            value = sensorManager.readSensor(SensorType.BLOOD_PRESSURE),
+                            valueType = field.valueType,
+                            fieldMask = field.fieldMask,
+                            allowFutureDates = field.allowFutureDates,
+                        ),
+                    )
                 }
             }
         }
