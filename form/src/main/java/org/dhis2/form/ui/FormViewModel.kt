@@ -1076,7 +1076,21 @@ class FormViewModel(
     fun fetchPeriods(): Flow<PagingData<Period>> = repository.fetchPeriods().flowOn(dispatcher.io())
 
     private fun autoFillMedicalFields(fields: List<FieldUiModel>) {
-        // To be implemented
+        fields.forEach { field ->
+            if (field.value.isNullOrEmpty() && field.editable) {
+                if (field.label.contains("Temperature", ignoreCase = true)) {
+                    submitIntent(
+                        FormIntent.OnSave(
+                            uid = field.uid,
+                            value = sensorManager.readSensor(SensorType.TEMPERATURE),
+                            valueType = field.valueType,
+                            fieldMask = field.fieldMask,
+                            allowFutureDates = field.allowFutureDates,
+                        ),
+                    )
+                }
+            }
+        }
     }
 
     companion object {
