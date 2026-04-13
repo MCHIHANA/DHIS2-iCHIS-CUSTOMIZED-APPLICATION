@@ -1081,13 +1081,14 @@ class FormViewModel(
             if (field.value.isNullOrEmpty() && field.editable) {
                 val sensorType = when {
                     field.label.contains("Temperature", ignoreCase = true) -> SensorType.TEMPERATURE
-                    field.label.contains("Weight", ignoreCase = true) -> SensorType.重量
+                    field.label.contains("Weight", ignoreCase = true) -> SensorType.WEIGHT
                     field.label.contains("Heart Rate", ignoreCase = true) -> SensorType.HEART_RATE
                     field.label.contains("Blood Pressure", ignoreCase = true) -> SensorType.BLOOD_PRESSURE
                     else -> null
                 }
                 
                 sensorType?.let {
+                    Timber.d("Auto-filling field ${field.label} using sensor")
                     submitIntent(
                         FormIntent.OnSave(
                             uid = field.uid,
