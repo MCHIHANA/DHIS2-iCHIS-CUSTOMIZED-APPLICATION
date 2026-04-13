@@ -1079,41 +1079,19 @@ class FormViewModel(
     private fun autoFillMedicalFields(fields: List<FieldUiModel>) {
         fields.forEach { field ->
             if (field.value.isNullOrEmpty() && field.editable) {
-                if (field.label.contains("Temperature", ignoreCase = true)) {
+                val sensorType = when {
+                    field.label.contains("Temperature", ignoreCase = true) -> SensorType.TEMPERATURE
+                    field.label.contains("Weight", ignoreCase = true) -> SensorType.重量
+                    field.label.contains("Heart Rate", ignoreCase = true) -> SensorType.HEART_RATE
+                    field.label.contains("Blood Pressure", ignoreCase = true) -> SensorType.BLOOD_PRESSURE
+                    else -> null
+                }
+                
+                sensorType?.let {
                     submitIntent(
                         FormIntent.OnSave(
                             uid = field.uid,
-                            value = sensorManager.readSensor(SensorType.TEMPERATURE),
-                            valueType = field.valueType,
-                            fieldMask = field.fieldMask,
-                            allowFutureDates = field.allowFutureDates,
-                        ),
-                    )
-                } else if (field.label.contains("Weight", ignoreCase = true)) {
-                    submitIntent(
-                        FormIntent.OnSave(
-                            uid = field.uid,
-                            value = sensorManager.readSensor(SensorType.WEIGHT),
-                            valueType = field.valueType,
-                            fieldMask = field.fieldMask,
-                            allowFutureDates = field.allowFutureDates,
-                        ),
-                    )
-                } else if (field.label.contains("Heart Rate", ignoreCase = true)) {
-                    submitIntent(
-                        FormIntent.OnSave(
-                            uid = field.uid,
-                            value = sensorManager.readSensor(SensorType.HEART_RATE),
-                            valueType = field.valueType,
-                            fieldMask = field.fieldMask,
-                            allowFutureDates = field.allowFutureDates,
-                        ),
-                    )
-                } else if (field.label.contains("Blood Pressure", ignoreCase = true)) {
-                    submitIntent(
-                        FormIntent.OnSave(
-                            uid = field.uid,
-                            value = sensorManager.readSensor(SensorType.BLOOD_PRESSURE),
+                            value = sensorManager.readSensor(it),
                             valueType = field.valueType,
                             fieldMask = field.fieldMask,
                             allowFutureDates = field.allowFutureDates,
