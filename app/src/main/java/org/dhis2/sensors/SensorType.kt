@@ -1,5 +1,8 @@
 package org.dhis2.sensors
 
 enum class SensorType {
-    TEMPERATURE
+    TEMPERATURE,
+    WEIGHT,
+    HEART_RATE
+
 }
