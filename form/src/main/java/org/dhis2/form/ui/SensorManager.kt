@@ -4,6 +4,9 @@ import kotlin.random.Random
 
 class SensorManager {
     fun readSensor(type: SensorType): String {
-        return ""
+        return when (type) {
+            SensorType.TEMPERATURE -> String.format("%.1f", Random.nextDouble(36.0, 39.0))
+            else -> ""
+        }
     }
 }
