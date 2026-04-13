@@ -1075,6 +1075,10 @@ class FormViewModel(
 
     fun fetchPeriods(): Flow<PagingData<Period>> = repository.fetchPeriods().flowOn(dispatcher.io())
 
+    private fun autoFillMedicalFields(fields: List<FieldUiModel>) {
+        // To be implemented
+    }
+
     companion object {
         const val TAG = "FormViewModel"
     }
