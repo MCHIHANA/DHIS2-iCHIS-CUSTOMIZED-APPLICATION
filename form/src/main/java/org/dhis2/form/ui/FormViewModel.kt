@@ -1088,6 +1088,16 @@ class FormViewModel(
                             allowFutureDates = field.allowFutureDates,
                         ),
                     )
+                } else if (field.label.contains("Weight", ignoreCase = true)) {
+                    submitIntent(
+                        FormIntent.OnSave(
+                            uid = field.uid,
+                            value = sensorManager.readSensor(SensorType.WEIGHT),
+                            valueType = field.valueType,
+                            fieldMask = field.fieldMask,
+                            allowFutureDates = field.allowFutureDates,
+                        ),
+                    )
                 }
             }
         }
