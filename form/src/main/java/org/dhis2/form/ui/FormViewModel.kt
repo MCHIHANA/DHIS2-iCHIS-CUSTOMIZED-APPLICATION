@@ -1025,6 +1025,7 @@ class FormViewModel(
                 }.await()
             try {
                 _items.postValue(result)
+                autoFillMedicalFields(result)
             } catch (e: Exception) {
                 Timber.e(e)
                 _items.postValue(emptyList())
