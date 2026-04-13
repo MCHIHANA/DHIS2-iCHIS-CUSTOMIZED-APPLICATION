@@ -120,6 +120,8 @@ class FormViewModel(
 
     private val handler = Handler(Looper.getMainLooper())
 
+    private val sensorManager = SensorManager()
+
     var filePath: String? = null
 
     init {
