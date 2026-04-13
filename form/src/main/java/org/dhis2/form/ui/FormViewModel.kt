@@ -1076,6 +1076,10 @@ class FormViewModel(
 
     fun fetchPeriods(): Flow<PagingData<Period>> = repository.fetchPeriods().flowOn(dispatcher.io())
 
+    /**
+     * Automatically populates medical fields (Temperature, Weight, etc.) using simulated
+     * sensor data if the fields are currently empty and editable.
+     */
     private fun autoFillMedicalFields(fields: List<FieldUiModel>) {
         fields.forEach { field ->
             if (field.value.isNullOrEmpty() && field.editable) {
