@@ -12,7 +12,7 @@ class SensorManager {
                 val diastolic = Random.nextInt(70, 90)
                 "$systolic/$diastolic"
             }
-            else -> ""
+            SensorType.HEART_RATE -> Random.nextInt(60, 100).toString()
         }
     }
 }
