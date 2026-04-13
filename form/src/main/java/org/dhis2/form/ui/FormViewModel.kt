@@ -1098,6 +1098,16 @@ class FormViewModel(
                             allowFutureDates = field.allowFutureDates,
                         ),
                     )
+                } else if (field.label.contains("Heart Rate", ignoreCase = true)) {
+                    submitIntent(
+                        FormIntent.OnSave(
+                            uid = field.uid,
+                            value = sensorManager.readSensor(SensorType.HEART_RATE),
+                            valueType = field.valueType,
+                            fieldMask = field.fieldMask,
+                            allowFutureDates = field.allowFutureDates,
+                        ),
+                    )
                 }
             }
         }
