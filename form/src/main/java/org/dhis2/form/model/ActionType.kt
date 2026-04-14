@@ -12,4 +12,5 @@ enum class ActionType {
     ON_STORE_FILE,
     ON_ADD_IMAGE_FINISHED,
     ON_FETCH_OPTIONS,
+    ON_SENSOR_SCAN,
 }

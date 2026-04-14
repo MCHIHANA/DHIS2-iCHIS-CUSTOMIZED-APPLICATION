@@ -2,9 +2,25 @@ package org.dhis2.form.ui.provider.inputfield
 
 import android.content.Intent
 import androidx.compose.foundation.focusable
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.relocation.BringIntoViewRequester
 import androidx.compose.foundation.relocation.bringIntoViewRequester
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import org.dhis2.form.R
+import org.hisp.dhis.mobile.ui.designsystem.theme.Spacing
+import org.dhis2.form.ui.dialog.SensorConnectionBottomSheet
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.foundation.layout.Column
+import androidx.compose.ui.input.pointer.pointerInput
+import org.hisp.dhis.mobile.ui.designsystem.theme.TextColor
+import org.hisp.dhis.mobile.ui.designsystem.component.Button
+import org.hisp.dhis.mobile.ui.designsystem.component.ButtonStyle
+import org.hisp.dhis.mobile.ui.designsystem.component.InputShellState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -12,8 +28,13 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusManager
+import androidx.compose.material3.Text
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
@@ -61,10 +82,13 @@ fun FieldProvider(
     modifier: Modifier,
     inputStyle: InputStyle = InputStyle.DataInputStyle(),
     fieldUiModel: FieldUiModel,
-    uiEventHandler: (RecyclerViewUiEvents) -> Unit,
     intentHandler: (FormIntent) -> Unit,
+    uiEventHandler: (RecyclerViewUiEvents) -> Unit,
     resources: ResourceManager,
     focusManager: FocusManager,
+    sensorStatus: String?,
+    isScanning: Boolean,
+    onConnectToSensor: (String) -> Unit,
     onNextClicked: () -> Unit,
     onFileSelected: (String) -> Unit,
     reEvaluateCustomIntentRequestParameters: Boolean,
@@ -145,18 +169,86 @@ fun FieldProvider(
             )
 
         else ->
-            ProvideByValueType(
-                modifier = modifierWithFocus,
-                inputStyle = inputStyle,
+            SensorButtonWrapper(
                 fieldUiModel = fieldUiModel,
                 intentHandler = intentHandler,
-                uiEventHandler = uiEventHandler,
-                resources = resources,
-                focusRequester = focusRequester,
-                onNextClicked = onNextClicked,
-                focusManager = focusManager,
-                onFileSelected = onFileSelected,
+                sensorStatus = sensorStatus,
+                isScanning = isScanning,
+                onConnectToSensor = onConnectToSensor,
+            ) {
+                ProvideByValueType(
+                    modifier = modifierWithFocus,
+                    inputStyle = inputStyle,
+                    fieldUiModel = fieldUiModel,
+                    intentHandler = intentHandler,
+                    uiEventHandler = uiEventHandler,
+                    resources = resources,
+                    focusRequester = focusRequester,
+                    onNextClicked = onNextClicked,
+                    focusManager = focusManager,
+                    onFileSelected = onFileSelected,
+                )
+            }
+    }
+}
+
+@Composable
+fun SensorButtonWrapper(
+    fieldUiModel: FieldUiModel,
+    intentHandler: (FormIntent) -> Unit,
+    sensorStatus: String?,
+    isScanning: Boolean,
+    onConnectToSensor: (String) -> Unit,
+    content: @Composable () -> Unit,
+) {
+    val isSensorField = remember(fieldUiModel.label) {
+        val label = fieldUiModel.label.lowercase()
+        label.contains("temperature") ||
+            label.contains("weight") ||
+            label.contains("heart rate") ||
+            label.contains("systolic") ||
+            label.contains("diastolic") ||
+            label.contains("blood pressure")
+    }
+
+    if (isSensorField && fieldUiModel.editable) {
+        Column(modifier = Modifier.fillMaxWidth()) {
+            Box(
+                modifier = if (isScanning) {
+                    Modifier
+                        .graphicsLayer(alpha = 0.5f)
+                        .pointerInput(Unit) {} // Consume touch events
+                } else {
+                    Modifier
+                }
+            ) {
+                content()
+            }
+            
+            if (isScanning || !sensorStatus.isNullOrEmpty()) {
+                Text(
+                    text = sensorStatus ?: "Searching...",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = if (sensorStatus?.contains("connected", true) == true) 
+                        Color(0xFF4CAF50) else MaterialTheme.colorScheme.secondary,
+                    modifier = Modifier.padding(horizontal = Spacing.Spacing16, vertical = Spacing.Spacing4)
+                )
+            }
+
+            Button(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = Spacing.Spacing16, vertical = Spacing.Spacing8),
+                text = "Connect to Sensor",
+                style = ButtonStyle.OUTLINED,
+                enabled = !isScanning,
+                onClick = {
+                    onConnectToSensor(fieldUiModel.uid)
+                }
             )
+        }
+    } else {
+        content()
     }
 }
 

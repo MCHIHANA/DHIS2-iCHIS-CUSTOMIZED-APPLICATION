@@ -100,4 +100,8 @@ sealed class FormIntent {
         val optionSetUid: String,
         val value: String?,
     ) : FormIntent()
+    data class OnSensorScanRequested(
+        val uid: String,
+        val connectionType: String,
+    ) : FormIntent()
 }
