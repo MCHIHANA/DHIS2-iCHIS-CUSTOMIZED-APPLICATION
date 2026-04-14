@@ -162,6 +162,8 @@ class FormViewModel(
                 ValueStoreResult.VALUE_CHANGED -> {
                     result.first.let {
                         _savedValue.postValue(it)
+                        // Show success message for sensor data
+                        showSensorSyncSuccessIfApplicable(it.id)
                     }
                     processCalculatedItems()
                 }
@@ -518,10 +520,15 @@ class FormViewModel(
                         intent.allowFutureDates,
                     )
 
+                // Additional sensor validation
+                val sensorError = checkSensorValidation(intent.uid, intent.value)
+
+                val finalError = error ?: sensorError
+
                 createRowAction(
                     uid = intent.uid,
                     value = intent.value,
-                    error = error,
+                    error = finalError,
                     valueType = intent.valueType,
                 )
             }
@@ -1090,7 +1097,7 @@ class FormViewModel(
                     field.label.contains("Blood Pressure", ignoreCase = true) -> SensorType.BLOOD_PRESSURE
                     else -> null
                 }
-                
+
                 sensorType?.let {
                     Timber.d("Auto-filling field ${field.label} using sensor")
                     submitIntent(
@@ -1104,6 +1111,25 @@ class FormViewModel(
                     )
                 }
             }
+        }
+    }
+
+    private fun showSensorSyncSuccessIfApplicable(uid: String) {
+        val field = _items.value?.find { it.uid == uid } ?: return
+        val isSensorField = when {
+            field.label.contains("Temperature", ignoreCase = true) -> true
+            field.label.contains("Weight", ignoreCase = true) -> true
+            field.label.contains("Heart Rate", ignoreCase = true) -> true
+            field.label.contains("Blood Pressure", ignoreCase = true) -> true
+            else -> false
+        }
+        if (isSensorField) {
+            showInfo.postValue(
+                InfoUiModel(
+                    "Success", // Or use a string resource if available
+                    "Sensor data synced successfully.",
+                ),
+            )
         }
     }
 

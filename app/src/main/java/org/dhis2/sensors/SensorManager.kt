@@ -25,4 +25,51 @@ class SensorManager {
             else -> ""
         }
     }
+
+    /**
+     * Validates a sensor reading value.
+     *
+     * @param type The type of sensor.
+     * @param value The value to validate.
+     * @return true if valid, false otherwise.
+     */
+    fun validateSensorValue(type: SensorType, value: String?): Boolean {
+        if (value.isNullOrEmpty()) return true // Allow empty values
+
+        return when (type) {
+            SensorType.TEMPERATURE -> {
+                val temp = value.toDoubleOrNull()
+                temp != null && temp in 30.0..45.0
+            }
+            SensorType.WEIGHT -> {
+                val weight = value.toIntOrNull()
+                weight != null && weight in 1..300
+            }
+            SensorType.HEART_RATE -> {
+                val heartRate = value.toIntOrNull()
+                heartRate != null && heartRate in 30..200
+            }
+            SensorType.BLOOD_PRESSURE -> {
+                value.matches(Regex("\\d+/\\d+")) // Format like 120/80
+            }
+            else -> true
+        }
+    }
+
+    /**
+     * Logs a sensor reading.
+     *
+     * @param type The type of sensor.
+     * @param value The value recorded.
+     */
+    fun logSensorReading(type: SensorType, value: String) {
+        val logMessage = when (type) {
+            SensorType.TEMPERATURE -> "Temperature recorded: $value"
+            SensorType.WEIGHT -> "Weight recorded: $value"
+            SensorType.HEART_RATE -> "Heart Rate recorded: $value"
+            SensorType.BLOOD_PRESSURE -> "Blood Pressure recorded: $value"
+            else -> "$type recorded: $value"
+        }
+        println(logMessage) // Or use Timber.d(logMessage)
+    }
 }
