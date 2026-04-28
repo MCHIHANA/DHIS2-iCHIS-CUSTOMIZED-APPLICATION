@@ -63,6 +63,7 @@ fun provideParameterSelectorItem(
                 intentHandler = callback::intent,
                 resources = resources,
                 focusManager = focusManager,
+                sensorConfig = null,
                 sensorStatus = null,
                 isScanning = false,
                 onConnectToSensor = {},

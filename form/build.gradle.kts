@@ -66,6 +66,10 @@ dependencies {
     implementation(project(":dhis2_android_maps"))
     implementation(project(":dhis2-mobile-program-rules"))
     implementation(libs.androidx.activity.compose)
+    implementation(libs.koin.core)
+    implementation(libs.koin.android)
+    implementation(libs.google.gson)
+    
     testImplementation(libs.bundles.form.test)
     testImplementation(libs.test.junit)
     androidTestImplementation(libs.test.compose.ui.test)

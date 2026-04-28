@@ -2,6 +2,7 @@ package org.dhis2.form.ui
 
 import android.os.Handler
 import android.os.Looper
+import android.bluetooth.BluetoothDevice
 import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.ViewModel
@@ -56,6 +57,8 @@ import org.dhis2.form.ui.event.RecyclerViewUiEvents
 import org.dhis2.form.ui.idling.FormCountingIdlingResource
 import org.dhis2.form.ui.intent.FormIntent
 import org.dhis2.form.ui.provider.FormResultDialogProvider
+import org.dhis2.sensor.ble.BleManager
+import org.dhis2.sensor.config.SensorConfigRepository
 import org.dhis2.mobile.commons.model.CustomIntentRequestArgumentModel
 import org.dhis2.mobile.commons.providers.CustomIntentFailure
 import org.dhis2.mobile.commons.validation.validators.FieldMaskValidator
@@ -77,6 +80,8 @@ import java.time.format.DateTimeParseException
 class FormViewModel(
     private val repository: FormRepository,
     private val dispatcher: DispatcherProvider,
+    val bleManager: BleManager,
+    val sensorConfigRepository: SensorConfigRepository,
     private val geometryController: GeometryController = GeometryController(GeometryParserImpl()),
     private val openErrorLocation: Boolean = false,
     private val resultDialogUiProvider: FormResultDialogProvider,
@@ -95,6 +100,8 @@ class FormViewModel(
 
     private val _isFieldScanning = MutableStateFlow<Map<String, Boolean>>(emptyMap())
     val isFieldScanning: StateFlow<Map<String, Boolean>> = _isFieldScanning.asStateFlow()
+
+    val foundDevices: StateFlow<List<BluetoothDevice>> = bleManager.devices
 
     var previousActionItem: RowAction? = null
 
@@ -164,6 +171,36 @@ class FormViewModel(
         }
 
         loadData()
+        observeSensorData()
+    }
+
+    private fun observeSensorData() {
+        bleManager.sensorData.onEach { data ->
+            data?.let { (uuid, value) ->
+                val fieldUid = repository.currentFocusedItem()?.uid ?: return@let
+                
+                // UUID matching with SensorConfig mapping
+                val expectedConfig = sensorConfigRepository.getConfigByDataElement(fieldUid)
+                if (expectedConfig != null && expectedConfig.serviceUUID?.uppercase() != uuid.uppercase()) {
+                    Timber.w("UUID mismatch: expected ${expectedConfig.serviceUUID}, got $uuid. Allowing fallback.")
+                    return@let // Failsafe: let it fall back
+                }
+
+                submitIntent(FormIntent.OnSave(fieldUid, value, ValueType.TEXT))
+                _sensorStatuses.update { it + (fieldUid to "Data received: $value") }
+            }
+        }.launchIn(viewModelScope)
+
+        bleManager.connectionState.onEach { state ->
+             val fieldUid = repository.currentFocusedItem()?.uid ?: return@onEach
+             val status = when(state) {
+                 org.dhis2.sensor.ble.BleManager.ConnectionState.CONNECTED -> "Connected"
+                 org.dhis2.sensor.ble.BleManager.ConnectionState.CONNECTING -> "Connecting..."
+                 org.dhis2.sensor.ble.BleManager.ConnectionState.DISCONNECTED -> "Disconnected"
+                 org.dhis2.sensor.ble.BleManager.ConnectionState.DISCONNECTING -> "Disconnecting..."
+             }
+             _sensorStatuses.update { it + (fieldUid to status) }
+        }.launchIn(viewModelScope)
     }
 
     private fun displayResult(result: Pair<RowAction, StoreResult>) {
@@ -611,6 +648,13 @@ class FormViewModel(
                     actionType = ActionType.ON_ADD_IMAGE_FINISHED,
                 )
 
+            is FormIntent.OnAddImageFinished ->
+                createRowAction(
+                    uid = intent.uid,
+                    value = null,
+                    actionType = ActionType.ON_ADD_IMAGE_FINISHED,
+                )
+
             is FormIntent.OnStoreFile ->
                 createRowAction(
                     uid = intent.uid,
@@ -647,7 +691,7 @@ class FormViewModel(
                 createRowAction(
                     uid = intent.uid,
                     value = null,
-                    extraData = intent.connectionType,
+                    extraData = intent.connectionType?.name,
                     actionType = ActionType.ON_SENSOR_SCAN,
                 )
         }
@@ -1044,7 +1088,6 @@ class FormViewModel(
                 }.await()
             try {
                 _items.postValue(result)
-                autoFillMedicalFields(result)
             } catch (e: Exception) {
                 Timber.e(e)
                 _items.postValue(emptyList())
@@ -1098,77 +1141,44 @@ class FormViewModel(
 
     private fun handleOnSensorScanRequested(action: RowAction): StoreResult {
         val uid = action.id
-        val connectionType = action.extraData ?: "Bluetooth"
-        val field = _items.value?.find { it.uid == uid } ?: return StoreResult(uid, ValueStoreResult.VALUE_HAS_NOT_CHANGED)
+        val connectionTypeStr = action.extraData
+        val connectionType = connectionTypeStr?.let {
+            try {
+                org.dhis2.sensor.connection.ConnectionType.valueOf(it)
+            } catch (e: IllegalArgumentException) {
+                org.dhis2.sensor.connection.ConnectionType.BLE // Default to BLE
+            }
+        } ?: org.dhis2.sensor.connection.ConnectionType.BLE // Default to BLE
 
         _isFieldScanning.update { it + (uid to true) }
-        _sensorStatuses.update { it + (uid to "Searching...") }
 
-        viewModelScope.launch {
-            try {
-                Timber.d("Scanning via $connectionType for $uid")
-                val sensorType = when {
-                    field.label.contains("Temperature", ignoreCase = true) -> SensorType.TEMPERATURE
-                    field.label.contains("Weight", ignoreCase = true) -> SensorType.WEIGHT
-                    field.label.contains("Heart Rate", ignoreCase = true) -> SensorType.HEART_RATE
-                    field.label.contains("Systolic", ignoreCase = true) -> SensorType.SYSTOLIC
-                    field.label.contains("Diastolic", ignoreCase = true) -> SensorType.DIASTOLIC
-                    else -> SensorType.TEMPERATURE
-                }
+        // Start timeout for 5 minutes
+        org.dhis2.sensor.connection.ConnectionTimeoutManager.startTimeout(viewModelScope) {
+            _isFieldScanning.update { it + (uid to false) }
+            _sensorStatuses.update { it + (uid to "No connections available") }
+        }
 
-                val value = SensorConnectionManager.scan(sensorType)
-                Timber.d("Value received: $value")
-                
-                if (value != null) {
-                    _sensorStatuses.update { it + (uid to "Sensor connected") }
-                    handleOnSaveAction(action.copy(value = value, type = ActionType.ON_SAVE))
-                } else {
-                    _sensorStatuses.update { it + (uid to "Sensor not found. Enter manually.") }
-                }
-            } catch (e: Exception) {
-                Timber.e(e, "Error scanning")
-                _sensorStatuses.update { it + (uid to "Error. Enter manually.") }
-            } finally {
-                _isFieldScanning.update { it + (uid to false) }
+        when (connectionType) {
+            org.dhis2.sensor.connection.ConnectionType.BLE -> {
+                _sensorStatuses.update { it + (uid to "Scanning BLE devices...") }
+                bleManager.startScan()
+            }
+            org.dhis2.sensor.connection.ConnectionType.USB -> {
+                _sensorStatuses.update { it + (uid to "Scanning USB devices...") }
+                // USB scanning will be implemented via ConnectionManager
+            }
+            org.dhis2.sensor.connection.ConnectionType.WIFI -> {
+                _sensorStatuses.update { it + (uid to "Scanning WiFi devices...") }
+                // WiFi scanning will be implemented via ConnectionManager
             }
         }
 
         return StoreResult(uid, ValueStoreResult.VALUE_CHANGED)
     }
 
-    /**
-     * Automatically populates medical fields (Temperature, Weight, etc.) using simulated
-     * sensor data if the fields are currently empty and editable.
-     */
-    private fun autoFillMedicalFields(fields: List<FieldUiModel>) {
-        fields.forEach { field ->
-            if (field.value.isNullOrEmpty() && field.editable) {
-                val sensorType = when {
-                    field.label.contains("Temperature", ignoreCase = true) -> SensorType.TEMPERATURE
-                    field.label.contains("Weight", ignoreCase = true) -> SensorType.WEIGHT
-                    field.label.contains("Heart Rate", ignoreCase = true) -> SensorType.HEART_RATE
-                    field.label.contains("Systolic", ignoreCase = true) -> SensorType.SYSTOLIC
-                    field.label.contains("Diastolic", ignoreCase = true) -> SensorType.DIASTOLIC
-                    else -> null
-                }
-                
-                sensorType?.let { type ->
-                    Timber.d("Auto-filling field ${field.label} using sensor")
-                    viewModelScope.launch {
-                        val value = SensorConnectionManager.scan(type)
-                        submitIntent(
-                            FormIntent.OnSave(
-                                uid = field.uid,
-                                value = value,
-                                valueType = field.valueType,
-                                fieldMask = field.fieldMask,
-                                allowFutureDates = field.allowFutureDates,
-                            ),
-                        )
-                    }
-                }
-            }
-        }
+    fun connectToDevice(device: BluetoothDevice) {
+        org.dhis2.sensor.connection.ConnectionTimeoutManager.cancelTimeout()
+        bleManager.connectDevice(device)
     }
 
     companion object {

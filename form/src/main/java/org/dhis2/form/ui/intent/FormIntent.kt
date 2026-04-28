@@ -102,6 +102,6 @@ sealed class FormIntent {
     ) : FormIntent()
     data class OnSensorScanRequested(
         val uid: String,
-        val connectionType: String,
+        val connectionType: org.dhis2.sensor.connection.ConnectionType? = null,
     ) : FormIntent()
 }

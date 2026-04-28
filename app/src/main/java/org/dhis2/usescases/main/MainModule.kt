@@ -38,6 +38,11 @@ class MainModule(
 ) {
     @Provides
     @PerActivity
+    fun provideSensorConfigRepository(d2: D2): org.dhis2.sensor.config.SensorConfigRepository =
+        org.dhis2.sensor.config.SensorConfigRepository(view.context, org.dhis2.sensor.config.SensorConfigApi(d2))
+
+    @Provides
+    @PerActivity
     fun homePresenter(
         homeRepository: HomeRepository,
         schedulerProvider: SchedulerProvider,
@@ -53,6 +58,7 @@ class MainModule(
         versionRepository: VersionRepository,
         dispatcherProvider: DispatcherProvider,
         logoutUser: LogoutUser,
+        sensorConfigRepository: org.dhis2.sensor.config.SensorConfigRepository,
     ): MainPresenter =
         MainPresenter(
             view,
@@ -71,6 +77,7 @@ class MainModule(
             dispatcherProvider,
             forceToNotSynced,
             logoutUser,
+            sensorConfigRepository,
         )
 
     @Provides

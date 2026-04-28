@@ -22,6 +22,12 @@ class SensorConfigRepository(
             sensorConfigFlow.value = response.sensors
             cacheConfig(response)
             Log.d("SensorConfig", "Loaded sensors: ${response.sensors.size}")
+            response.sensors.forEach { sensor ->
+                Log.d("SensorConfig", sensor.name)
+                if (sensor.serviceUUID != null) {
+                    Log.d("SensorConfig", sensor.serviceUUID)
+                }
+            }
         } catch (e: Exception) {
             Log.e("SensorConfig", "Fetch failed — loading cache", e)
             loadFromCache()
@@ -59,6 +65,12 @@ class SensorConfigRepository(
     fun findConfigByName(name: String): SensorConfig? {
         return sensorConfigFlow.value.find { 
             it.name.equals(name, ignoreCase = true) 
+        }
+    }
+
+    fun getConfigByDataElement(uid: String): SensorConfig? {
+        return sensorConfigFlow.value.find { 
+            it.dataElement == uid || it.dataElements?.systolic == uid || it.dataElements?.diastolic == uid
         }
     }
 }
