@@ -4,9 +4,11 @@ import android.content.Intent
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.relocation.BringIntoViewRequester
 import androidx.compose.foundation.relocation.bringIntoViewRequester
 import androidx.compose.material3.Icon
@@ -43,6 +45,7 @@ import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.text.TextRange
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.TextFieldValue
 import kotlinx.coroutines.delay
@@ -60,6 +63,7 @@ import org.dhis2.form.ui.event.RecyclerViewUiEvents
 import org.dhis2.form.ui.intent.FormIntent
 import org.dhis2.form.ui.keyboard.keyboardAsState
 import org.dhis2.form.ui.provider.onFieldFocusChanged
+import org.dhis2.sensor.config.SensorAvailabilityManager
 import org.hisp.dhis.android.core.common.ValueType
 import org.hisp.dhis.mobile.ui.designsystem.component.InputEmail
 import org.hisp.dhis.mobile.ui.designsystem.component.InputInteger
@@ -76,6 +80,9 @@ import org.hisp.dhis.mobile.ui.designsystem.component.InputPositiveInteger
 import org.hisp.dhis.mobile.ui.designsystem.component.InputPositiveIntegerOrZero
 import org.hisp.dhis.mobile.ui.designsystem.component.InputStyle
 import org.hisp.dhis.mobile.ui.designsystem.component.model.RegExValidations
+import androidx.compose.ui.platform.LocalContext
+import org.dhis2.form.ui.FormViewModel
+import androidx.compose.runtime.collectAsState
 
 @Composable
 fun FieldProvider(
@@ -92,6 +99,7 @@ fun FieldProvider(
     onNextClicked: () -> Unit,
     onFileSelected: (String) -> Unit,
     reEvaluateCustomIntentRequestParameters: Boolean,
+    viewModel: FormViewModel? = null
 ) {
     val bringIntoViewRequester = remember { BringIntoViewRequester() }
     val focusRequester = remember { FocusRequester() }
@@ -175,6 +183,7 @@ fun FieldProvider(
                 sensorStatus = sensorStatus,
                 isScanning = isScanning,
                 onConnectToSensor = onConnectToSensor,
+                viewModel = viewModel
             ) {
                 ProvideByValueType(
                     modifier = modifierWithFocus,
@@ -199,53 +208,74 @@ fun SensorButtonWrapper(
     sensorStatus: String?,
     isScanning: Boolean,
     onConnectToSensor: (String) -> Unit,
+    viewModel: FormViewModel? = null,
     content: @Composable () -> Unit,
 ) {
-    val isSensorField = remember(fieldUiModel.label) {
-        val label = fieldUiModel.label.lowercase()
-        label.contains("temperature") ||
-            label.contains("weight") ||
-            label.contains("heart rate") ||
-            label.contains("systolic") ||
-            label.contains("diastolic") ||
-            label.contains("blood pressure")
+    val context = LocalContext.current
+    val bleAvailable = remember { SensorAvailabilityManager.isBleSupported(context) }
+    
+    val sensorConfig = viewModel?.sensorConfigRepository?.getConfigByDataElement(fieldUiModel.uid)
+    val isSensorRequired = sensorConfig?.sensorRequired ?: false
+
+    val isSensorField = remember(fieldUiModel.label, sensorConfig) {
+        if (sensorConfig != null) {
+            true
+        } else {
+            val label = fieldUiModel.label.lowercase()
+            label.contains("temperature") ||
+                label.contains("weight") ||
+                label.contains("heart rate") ||
+                label.contains("systolic") ||
+                label.contains("diastolic") ||
+                label.contains("blood pressure")
+        }
     }
 
-    if (isSensorField && fieldUiModel.editable) {
+    if (bleAvailable && isSensorField && fieldUiModel.editable && (sensorConfig == null || isSensorRequired)) {
         Column(modifier = Modifier.fillMaxWidth()) {
-            Box(
-                modifier = if (isScanning) {
-                    Modifier
-                        .graphicsLayer(alpha = 0.5f)
-                        .pointerInput(Unit) {} // Consume touch events
-                } else {
-                    Modifier
-                }
+            // Row layout: [Field Content] [Spacer] [Connect Sensor Button]
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                content()
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .then(
+                            if (isScanning) {
+                                Modifier
+                                    .graphicsLayer(alpha = 0.5f)
+                                    .pointerInput(Unit) {} // Consume touch events
+                            } else {
+                                Modifier
+                            }
+                        )
+                ) {
+                    content()
+                }
+
+                // Spacer between field and button
+                Spacer(modifier = Modifier.width(4.dp))
+
+                // Inline "Connect Sensor" text button
+                org.dhis2.form.ui.sensor.SensorConnectButton(
+                    onClick = { onConnectToSensor(fieldUiModel.uid) }
+                )
             }
-            
+
+            // Status text below the field row
             if (isScanning || !sensorStatus.isNullOrEmpty()) {
                 Text(
                     text = sensorStatus ?: "Searching...",
                     style = MaterialTheme.typography.bodySmall,
-                    color = if (sensorStatus?.contains("connected", true) == true) 
-                        Color(0xFF4CAF50) else MaterialTheme.colorScheme.secondary,
+                    color = when {
+                        sensorStatus?.contains("connected", true) == true -> Color(0xFF4CAF50)
+                        sensorStatus?.contains("No connections available", true) == true -> Color(0xFFF44336)
+                        else -> MaterialTheme.colorScheme.secondary
+                    },
                     modifier = Modifier.padding(horizontal = Spacing.Spacing16, vertical = Spacing.Spacing4)
                 )
             }
-
-            Button(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = Spacing.Spacing16, vertical = Spacing.Spacing8),
-                text = "Connect to Sensor",
-                style = ButtonStyle.OUTLINED,
-                enabled = !isScanning,
-                onClick = {
-                    onConnectToSensor(fieldUiModel.uid)
-                }
-            )
         }
     } else {
         content()
@@ -1474,10 +1504,10 @@ private fun ProvideOrgUnitInput(
         onOrgUnitActionCLicked = {
             uiEventHandler.invoke(
                 RecyclerViewUiEvents.OpenOrgUnitDialog(
-                    fieldUiModel.uid,
-                    fieldUiModel.label,
-                    fieldUiModel.value,
-                    fieldUiModel.orgUnitSelectorScope,
+                    uid = fieldUiModel.uid,
+                    label = fieldUiModel.label,
+                    value = fieldUiModel.value,
+                    orgUnitSelectorScope = fieldUiModel.orgUnitSelectorScope,
                 ),
             )
         },
