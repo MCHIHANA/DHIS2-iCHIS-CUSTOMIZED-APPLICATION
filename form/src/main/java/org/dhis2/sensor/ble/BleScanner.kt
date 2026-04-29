@@ -6,12 +6,10 @@ import android.bluetooth.BluetoothDevice
 import android.bluetooth.BluetoothManager
 import android.bluetooth.le.ScanCallback
 import android.bluetooth.le.ScanResult
+import android.bluetooth.le.ScanSettings
 import android.content.Context
-import android.os.Handler
-import android.os.Looper
 import android.util.Log
 
-private const val SCAN_TIMEOUT_MS = 15_000L
 private const val TAG = "BLE_SCAN"
 
 @SuppressLint("MissingPermission")
@@ -27,16 +25,24 @@ class BleScanner(private val context: Context) {
 
     private val seenDevices = mutableListOf<BluetoothDevice>()
     private var scanCallback: ScanCallback? = null
-    private val timeoutHandler = Handler(Looper.getMainLooper())
 
     /**
-     * Starts a BLE scan.
+     * Starts a **continuous** BLE scan using LOW_LATENCY mode.
      *
-     * When any device in [KnownDevices.ALL] is detected the scan stops immediately and
-     * [onTargetFound] is invoked for automatic connection.
-     * Every discovered device is also reported via [onDeviceFound] so existing device-list
-     * UI keeps working.
-     * The scan auto-stops after [SCAN_TIMEOUT_MS] ms if no known device appears.
+     * The scan runs indefinitely — it does NOT stop on a timer.
+     * It stops only when a target device is found:
+     *   - Any MAC in [KnownDevices.ALL], OR
+     *   - Any device whose advertised name contains "FORA" (case-insensitive),
+     *     which covers the FORA IR42 thermometer and other FORA-branded sensors.
+     *
+     * Workflow:
+     *   1. User taps Temperature field → scan starts
+     *   2. User turns ON the sensor
+     *   3. Sensor broadcasts briefly → app detects it immediately
+     *   4. Scan stops, connection begins
+     *
+     * [onDeviceFound] is called for every new device (for device-list UI).
+     * [onTargetFound] is called once when the target sensor is detected.
      */
     fun startScan(
         onDeviceFound: (BluetoothDevice) -> Unit,
@@ -44,45 +50,57 @@ class BleScanner(private val context: Context) {
     ) {
         if (scanCallback != null) return // already scanning
 
+        val settings = ScanSettings.Builder()
+            .setScanMode(ScanSettings.SCAN_MODE_LOW_LATENCY)
+            .build()
+
         val callback = object : ScanCallback() {
             override fun onScanResult(callbackType: Int, result: ScanResult) {
                 val device = result.device ?: return
                 val address = device.address
+                val name = device.name ?: "Unknown"
 
-                Log.d(TAG, "Found device: $address")
+                Log.d("BLE_DEVICE", "Found → $name ($address)")
 
+                // Surface every new device to the UI list
                 if (!seenDevices.contains(device)) {
                     seenDevices.add(device)
                     onDeviceFound(device)
                 }
 
+                // Match by known MAC address
                 if (address in KnownDevices.ALL) {
-                    Log.d(TAG, "Known sensor detected: $address")
+                    Log.d("BLE_MATCH", "Known MAC detected: $address")
+                    stopScan()
+                    onTargetFound?.invoke(device)
+                    return
+                }
+
+                // Match by device name — catches FORA IR42 and other FORA sensors
+                if (name.contains("FORA", ignoreCase = true)) {
+                    Log.d("BLE_MATCH", "FORA sensor detected: $name ($address)")
                     stopScan()
                     onTargetFound?.invoke(device)
                 }
             }
+
+            override fun onScanFailed(errorCode: Int) {
+                Log.e(TAG, "Scan failed with error code: $errorCode")
+            }
         }
 
         scanCallback = callback
-        scanner?.startScan(callback)
-        Log.d(TAG, "Scan started")
-
-        // Auto-stop after timeout to prevent infinite scanning
-        timeoutHandler.postDelayed({
-            if (scanCallback != null) {
-                stopScan()
-                Log.d(TAG, "Scan timeout after ${SCAN_TIMEOUT_MS / 1000}s — no known sensor found")
-            }
-        }, SCAN_TIMEOUT_MS)
+        // No filters — scan all devices so name-based matching works
+        scanner?.startScan(null, settings, callback)
+        Log.d(TAG, "Starting continuous scan...")
     }
 
+    /** Stops the scan. Called automatically after a match, or manually on dismiss/disconnect. */
     fun stopScan() {
-        timeoutHandler.removeCallbacksAndMessages(null)
         scanCallback?.let {
             scanner?.stopScan(it)
             scanCallback = null
-            Log.d(TAG, "Scan stopped")
+            Log.d(TAG, "Scan stopped after match")
         }
     }
 }

@@ -1145,13 +1145,8 @@ class FormViewModel(
         _isFieldScanning.update { it + (uid to true) }
         _sensorStatuses.update { it + (uid to "Waiting for sensor...") }
 
-        // Auto-stop scanning after timeout
-        org.dhis2.sensor.connection.ConnectionTimeoutManager.startTimeout(viewModelScope) {
-            _isFieldScanning.update { it + (uid to false) }
-            _sensorStatuses.update { it + (uid to "No connections available") }
-        }
-
-        // Always BLE — USB and WiFi have been removed
+        // Continuous scan — no timeout. Scan runs until the sensor is detected or
+        // the user dismisses the dialog (which calls bleManager.stopScan()).
         bleManager.startScan()
 
         return StoreResult(uid, ValueStoreResult.VALUE_CHANGED)

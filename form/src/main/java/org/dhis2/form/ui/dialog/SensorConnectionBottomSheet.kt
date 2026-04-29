@@ -151,8 +151,7 @@ fun SensorConnectionScreen(
                     else -> {
                         BluetoothSensorStatus(status = status)
                     }
-                }
-            }
+                }            }
         },
         buttonBlock = {
             Button(
@@ -160,6 +159,7 @@ fun SensorConnectionScreen(
                 text = if (isScanning) "STOP SCAN" else "CANCEL",
                 onClick = {
                     coroutineScope.launch {
+                        viewModel.bleManager.stopScan()
                         delay(100)
                         onDismiss()
                     }
