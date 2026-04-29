@@ -2,6 +2,8 @@ package org.dhis2.sensor.ble
 
 import android.bluetooth.BluetoothDevice
 import android.content.Context
+import android.os.Handler
+import android.os.Looper
 import android.util.Log
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -16,6 +18,7 @@ class BleManager(
 ) {
 
     private val bleScanner = BleScanner(context)
+    private val mainHandler = Handler(Looper.getMainLooper())
 
     private val _devices = MutableStateFlow<List<BluetoothDevice>>(emptyList())
     val devices: StateFlow<List<BluetoothDevice>> = _devices.asStateFlow()
@@ -43,13 +46,14 @@ class BleManager(
     /**
      * Starts a continuous BLE scan filtered to the Health Thermometer service
      * (UUID 0x1809). When a matching device is detected the scan stops and a
-     * GATT connection is established to receive the temperature measurement.
+     * GATT connection is established on the **main thread** to receive the
+     * temperature measurement.
      *
      * Flow:
      *   1. User taps Temperature field → [startScan] is called
      *   2. User turns ON the thermometer
      *   3. Thermometer advertises service UUID 0x1809
-     *   4. Scanner detects it → stops scan → connects via GATT
+     *   4. Scanner detects it → stops scan → connects via GATT (main thread)
      *   5. GATT discovers services → subscribes to 0x2A1C (INDICATE)
      *   6. Thermometer sends measurement → [_sensorData] is updated
      *   7. FormViewModel observer saves the value to the form field
@@ -67,7 +71,8 @@ class BleManager(
             },
             onTargetFound = { device ->
                 Log.d(TAG, "Health Thermometer detected — connecting to ${device.address}")
-                connectDevice(device)
+                // connectGatt() MUST be called on the main thread to avoid crashes
+                mainHandler.post { connectDevice(device) }
             },
         )
     }

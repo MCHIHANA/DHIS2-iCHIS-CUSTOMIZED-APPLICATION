@@ -178,16 +178,21 @@ class FormViewModel(
         bleManager.sensorData.onEach { data ->
             data?.let { (uuid, value) ->
                 val fieldUid = repository.currentFocusedItem()?.uid ?: return@let
-                
-                // UUID matching with SensorConfig mapping
+
+                // Only reject if a config exists AND the UUID explicitly mismatches.
+                // If no config is registered for this field, allow the value through.
                 val expectedConfig = sensorConfigRepository.getConfigByDataElement(fieldUid)
-                if (expectedConfig != null && expectedConfig.serviceUUID?.uppercase() != uuid.uppercase()) {
-                    Timber.w("UUID mismatch: expected ${expectedConfig.serviceUUID}, got $uuid. Allowing fallback.")
-                    return@let // Failsafe: let it fall back
+                if (expectedConfig != null &&
+                    expectedConfig.serviceUUID != null &&
+                    expectedConfig.serviceUUID.uppercase() != uuid.uppercase()
+                ) {
+                    Timber.w("UUID mismatch: expected ${expectedConfig.serviceUUID}, got $uuid — skipping")
+                    return@let
                 }
 
                 submitIntent(FormIntent.OnSave(fieldUid, value, ValueType.TEXT))
                 _sensorStatuses.update { it + (fieldUid to "Data received: $value") }
+                _isFieldScanning.update { it + (fieldUid to false) }
             }
         }.launchIn(viewModelScope)
 
