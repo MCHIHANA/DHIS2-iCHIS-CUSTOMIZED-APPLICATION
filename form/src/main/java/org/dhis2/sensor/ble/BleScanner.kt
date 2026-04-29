@@ -29,24 +29,25 @@ class BleScanner(private val context: Context) {
     /**
      * Starts a **continuous** BLE scan using LOW_LATENCY mode.
      *
-     * The scan runs indefinitely — it does NOT stop on a timer.
-     * It stops only when a target device is found:
-     *   - Any MAC in [KnownDevices.ALL], OR
-     *   - Any device whose advertised name contains "FORA" (case-insensitive),
-     *     which covers the FORA IR42 thermometer and other FORA-branded sensors.
+     * For FORA sensors the temperature is read directly from the advertisement
+     * packet — no GATT connection is needed. The flow is:
      *
-     * Workflow:
      *   1. User taps Temperature field → scan starts
-     *   2. User turns ON the sensor
-     *   3. Sensor broadcasts briefly → app detects it immediately
-     *   4. Scan stops, connection begins
+     *   2. User turns ON the FORA IR42
+     *   3. Sensor broadcasts an advertisement containing the temperature
+     *   4. [onAdvertisementTemperature] is called with the parsed value
+     *   5. Scan stops — done, no GATT connection
      *
-     * [onDeviceFound] is called for every new device (for device-list UI).
-     * [onTargetFound] is called once when the target sensor is detected.
+     * If the advertisement does not contain a parseable temperature (e.g. a
+     * different FORA firmware or a non-FORA known-MAC device), [onTargetFound]
+     * is called instead so the existing GATT path takes over as a fallback.
+     *
+     * [onDeviceFound] is called for every new device (device-list UI).
      */
     fun startScan(
         onDeviceFound: (BluetoothDevice) -> Unit,
         onTargetFound: ((BluetoothDevice) -> Unit)? = null,
+        onAdvertisementTemperature: ((Double) -> Unit)? = null,
     ) {
         if (scanCallback != null) return // already scanning
 
@@ -68,20 +69,46 @@ class BleScanner(private val context: Context) {
                     onDeviceFound(device)
                 }
 
-                // Match by known MAC address
-                if (address in KnownDevices.ALL) {
-                    Log.d("BLE_MATCH", "Known MAC detected: $address")
+                val isFora = name.contains("FORA", ignoreCase = true)
+                val isKnownMac = address in KnownDevices.ALL
+
+                if (!isFora && !isKnownMac) return
+
+                // ── FORA advertisement path ───────────────────────────────
+                if (isFora) {
+                    Log.d("BLE_MATCH", "FORA advertisement detected: $name ($address)")
+
+                    val scanRecord = result.scanRecord
+                    val manufacturerData = scanRecord?.getManufacturerSpecificData()
+
+                    if (manufacturerData != null) {
+                        for (i in 0 until manufacturerData.size()) {
+                            val bytes = manufacturerData.valueAt(i)
+                            Log.d("BLE_ADV", "Device: $name | key=${manufacturerData.keyAt(i)}")
+
+                            val temperature = BleDataParser.parseAdvertisementTemperature(bytes)
+                            if (temperature != null) {
+                                Log.d("BLE_TEMP", "Temperature = $temperature °C")
+                                stopScan()
+                                Log.d("BLE_RESULT", "Temperature ready: $temperature")
+                                onAdvertisementTemperature?.invoke(temperature)
+                                return // done — no GATT needed
+                            }
+                        }
+                    }
+
+                    // Advertisement didn't contain a parseable temperature —
+                    // fall through to GATT connection as backup
+                    Log.d(TAG, "No temperature in advertisement — falling back to GATT")
                     stopScan()
                     onTargetFound?.invoke(device)
                     return
                 }
 
-                // Match by device name — catches FORA IR42 and other FORA sensors
-                if (name.contains("FORA", ignoreCase = true)) {
-                    Log.d("BLE_MATCH", "FORA sensor detected: $name ($address)")
-                    stopScan()
-                    onTargetFound?.invoke(device)
-                }
+                // ── Known-MAC path (non-FORA) → GATT connection ──────────
+                Log.d("BLE_MATCH", "Known MAC detected: $address")
+                stopScan()
+                onTargetFound?.invoke(device)
             }
 
             override fun onScanFailed(errorCode: Int) {
@@ -90,12 +117,11 @@ class BleScanner(private val context: Context) {
         }
 
         scanCallback = callback
-        // No filters — scan all devices so name-based matching works
         scanner?.startScan(null, settings, callback)
         Log.d(TAG, "Starting continuous scan...")
     }
 
-    /** Stops the scan. Called automatically after a match, or manually on dismiss/disconnect. */
+    /** Stops the scan. Called after a match or manually on dismiss. */
     fun stopScan() {
         scanCallback?.let {
             scanner?.stopScan(it)

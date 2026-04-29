@@ -10,6 +10,11 @@ import org.dhis2.sensor.config.SensorConfigRepository
 
 private const val TAG = "BleManager"
 
+/** UUID of the standard Temperature Measurement characteristic — used as the key
+ *  when emitting advertisement-sourced temperature values so the FormViewModel
+ *  observer treats them identically to GATT-sourced values. */
+private const val TEMP_CHAR_UUID = "00002A1C-0000-1000-8000-00805F9B34FB"
+
 class BleManager(
     private val context: Context,
     private val sensorConfigRepository: SensorConfigRepository,
@@ -23,7 +28,12 @@ class BleManager(
     private val _connectionState = MutableStateFlow<ConnectionState>(ConnectionState.DISCONNECTED)
     val connectionState: StateFlow<ConnectionState> = _connectionState.asStateFlow()
 
-    private val _sensorData = MutableStateFlow<Pair<String, String>?>(null) // (UUID, Value)
+    /**
+     * Emits sensor readings as (characteristicUUID, parsedValue) pairs.
+     * Populated by both the advertisement path (FORA IR42) and the GATT path
+     * (all other sensors), so FormViewModel needs no changes.
+     */
+    private val _sensorData = MutableStateFlow<Pair<String, String>?>(null)
     val sensorData: StateFlow<Pair<String, String>?> = _sensorData.asStateFlow()
 
     private val bleDeviceConnector = BleDeviceConnector(
@@ -37,12 +47,16 @@ class BleManager(
     )
 
     /**
-     * Starts a BLE scan.
+     * Starts a continuous BLE scan.
      *
-     * When the known temperature sensor ([TargetDeviceConfig.TEMPERATURE_SENSOR_MAC]) is
-     * detected the scan stops immediately and the app connects to it automatically — no manual
-     * device selection required.  All other discovered devices are still surfaced via [devices]
-     * so any existing device-list UI keeps working.
+     * **FORA IR42 (advertisement path — no GATT):**
+     * When a FORA device is detected the scanner reads the temperature directly
+     * from the advertisement packet, emits it to [_sensorData], and stops.
+     * No GATT connection is made.
+     *
+     * **Other known sensors (GATT path):**
+     * When a known MAC is detected the scanner stops and [connectDevice] is
+     * called to establish a GATT connection and read via notifications.
      */
     fun startScan() {
         _devices.value = emptyList()
@@ -55,8 +69,19 @@ class BleManager(
                     _devices.value = currentList
                 }
             },
+            onAdvertisementTemperature = { temperature ->
+                // Temperature read directly from advertisement — no GATT needed.
+                // Emit using the standard Temperature Measurement UUID so the
+                // FormViewModel observer handles it like any other sensor reading.
+                Log.d(TAG, "Advertisement temperature received: $temperature °C")
+                _connectionState.value = ConnectionState.CONNECTED
+                _sensorData.value = Pair(TEMP_CHAR_UUID, "%.1f".format(temperature))
+                // Mark as disconnected after emitting — sensor has powered off
+                _connectionState.value = ConnectionState.DISCONNECTED
+            },
             onTargetFound = { device ->
-                Log.d(TAG, "Auto-connecting to target sensor: ${device.address}")
+                // GATT fallback for non-FORA known-MAC sensors
+                Log.d(TAG, "Auto-connecting via GATT to: ${device.address}")
                 connectDevice(device)
             },
         )
