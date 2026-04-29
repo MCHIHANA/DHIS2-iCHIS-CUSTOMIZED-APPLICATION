@@ -174,13 +174,19 @@ class FormViewModel(
         observeSensorData()
     }
 
+    /** UID of the field currently waiting for a sensor reading. Set when scan starts. */
+    private var activeSensorFieldUid: String? = null
+
     private fun observeSensorData() {
         bleManager.sensorData.onEach { data ->
             data?.let { (uuid, value) ->
-                val fieldUid = repository.currentFocusedItem()?.uid ?: return@let
+                // Use the field UID captured at scan-start time.
+                // Fall back to the currently focused item if no scan is active.
+                val fieldUid = activeSensorFieldUid
+                    ?: repository.currentFocusedItem()?.uid
+                    ?: return@let
 
                 // Only reject if a config exists AND the UUID explicitly mismatches.
-                // If no config is registered for this field, allow the value through.
                 val expectedConfig = sensorConfigRepository.getConfigByDataElement(fieldUid)
                 if (expectedConfig != null &&
                     expectedConfig.serviceUUID != null &&
@@ -193,6 +199,7 @@ class FormViewModel(
                 submitIntent(FormIntent.OnSave(fieldUid, value, ValueType.TEXT))
                 _sensorStatuses.update { it + (fieldUid to "Data received: $value") }
                 _isFieldScanning.update { it + (fieldUid to false) }
+                activeSensorFieldUid = null // clear after successful read
             }
         }.launchIn(viewModelScope)
 
@@ -1147,6 +1154,7 @@ class FormViewModel(
     private fun handleOnSensorScanRequested(action: RowAction): StoreResult {
         val uid = action.id
 
+        activeSensorFieldUid = uid  // remember which field is waiting for the reading
         _isFieldScanning.update { it + (uid to true) }
         _sensorStatuses.update { it + (uid to "Waiting for sensor...") }
 

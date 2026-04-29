@@ -101,10 +101,22 @@ fun SensorConnectionScreen(
     val sensorStatuses by viewModel.sensorStatuses.collectAsState()
     val status = sensorStatuses[fieldUid] ?: ""
 
-    // Auto-dismiss once connected and value received
+    // Start scan immediately when dialog opens — no tap required
+    LaunchedEffect(Unit) {
+        Log.d("SensorBottomSheet", "Auto-starting BLE scan for field: $fieldUid")
+        viewModel.submitIntent(
+            FormIntent.OnSensorScanRequested(
+                uid = fieldUid,
+                connectionType = ConnectionType.BLE,
+            ),
+        )
+    }
+
+    // Auto-dismiss once data is received
     LaunchedEffect(status) {
-        if (status.startsWith("Data received") || status == "Connected") {
-            delay(800)
+        if (status.startsWith("Data received")) {
+            Log.d("SensorBottomSheet", "Data received — dismissing dialog: $status")
+            delay(1200) // brief pause so user sees the value
             onDismiss()
         }
     }
@@ -116,6 +128,7 @@ fun SensorConnectionScreen(
         ),
         onDismiss = {
             coroutineScope.launch {
+                viewModel.bleManager.stopScan()
                 delay(100)
                 onDismiss()
             }
@@ -128,35 +141,32 @@ fun SensorConnectionScreen(
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
                 when {
-                    // Idle — prompt user to start scan
-                    !isScanning && status.isEmpty() || status.startsWith("Disconnected") -> {
-                        BluetoothSensorIdle(
-                            onStartScan = {
-                                viewModel.submitIntent(
-                                    FormIntent.OnSensorScanRequested(
-                                        uid = fieldUid,
-                                        connectionType = ConnectionType.BLE,
-                                    ),
-                                )
-                            },
-                        )
+                    // Data received — show value
+                    status.startsWith("Data received") -> {
+                        BluetoothSensorStatus(status = status, isSuccess = true)
                     }
 
-                    // Scanning — waiting for known sensor to appear
-                    isScanning -> {
+                    // Error state
+                    status == "No connections available" -> {
+                        BluetoothSensorStatus(status = "No sensor found. Try again.", isSuccess = false)
+                    }
+
+                    // Connecting
+                    status == "Connecting..." -> {
+                        BluetoothSensorConnecting()
+                    }
+
+                    // Scanning (default — shown immediately on open)
+                    else -> {
                         BluetoothSensorSearching()
                     }
-
-                    // Connecting / Connected / Data received
-                    else -> {
-                        BluetoothSensorStatus(status = status)
-                    }
-                }            }
+                }
+            }
         },
         buttonBlock = {
             Button(
                 modifier = Modifier.fillMaxWidth(),
-                text = if (isScanning) "STOP SCAN" else "CANCEL",
+                text = "CANCEL",
                 onClick = {
                     coroutineScope.launch {
                         viewModel.bleManager.stopScan()
@@ -169,13 +179,12 @@ fun SensorConnectionScreen(
     )
 }
 
-/** Initial state — BLE not yet started. */
+/** Scanning — spinner shown immediately when dialog opens. */
 @Composable
-private fun BluetoothSensorIdle(onStartScan: () -> Unit) {
+private fun BluetoothSensorSearching() {
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable(onClick = onStartScan)
             .padding(vertical = Spacing.Spacing16),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
@@ -193,31 +202,6 @@ private fun BluetoothSensorIdle(onStartScan: () -> Unit) {
             fontWeight = FontWeight.Bold,
             style = MaterialTheme.typography.bodyLarge,
         )
-        Spacer(modifier = Modifier.height(Spacing.Spacing4))
-        Text(
-            text = "Tap to search for nearby sensors",
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-    }
-}
-
-/** Scanning state — spinner + message. */
-@Composable
-private fun BluetoothSensorSearching() {
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = Spacing.Spacing16),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center,
-    ) {
-        Text(
-            text = "Bluetooth Sensor",
-            fontSize = 18.sp,
-            fontWeight = FontWeight.Bold,
-            style = MaterialTheme.typography.bodyLarge,
-        )
         Spacer(modifier = Modifier.height(Spacing.Spacing8))
         Text(
             text = "Waiting for sensor...",
@@ -229,10 +213,30 @@ private fun BluetoothSensorSearching() {
     }
 }
 
-/** Connected / data-received state. */
+/** Connecting state — GATT connection in progress. */
 @Composable
-private fun BluetoothSensorStatus(status: String) {
-    val isSuccess = status.startsWith("Data received") || status == "Connected"
+private fun BluetoothSensorConnecting() {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = Spacing.Spacing16),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center,
+    ) {
+        Text(
+            text = "Connecting...",
+            fontSize = 18.sp,
+            fontWeight = FontWeight.Bold,
+            style = MaterialTheme.typography.bodyLarge,
+        )
+        Spacer(modifier = Modifier.height(Spacing.Spacing16))
+        ProgressIndicator(type = ProgressIndicatorType.CIRCULAR_SMALL)
+    }
+}
+
+/** Data received or error state. */
+@Composable
+private fun BluetoothSensorStatus(status: String, isSuccess: Boolean) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -243,7 +247,7 @@ private fun BluetoothSensorStatus(status: String) {
             text = status,
             style = MaterialTheme.typography.bodyLarge,
             fontWeight = FontWeight.Medium,
-            color = if (isSuccess) Color(0xFF4CAF50) else MaterialTheme.colorScheme.primary,
+            color = if (isSuccess) Color(0xFF4CAF50) else MaterialTheme.colorScheme.error,
         )
     }
 }
