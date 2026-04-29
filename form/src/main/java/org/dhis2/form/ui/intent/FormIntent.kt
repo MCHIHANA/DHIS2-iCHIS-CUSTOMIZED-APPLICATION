@@ -102,6 +102,8 @@ sealed class FormIntent {
     ) : FormIntent()
     data class OnSensorScanRequested(
         val uid: String,
-        val connectionType: String,
+        /** Always BLE — USB and WiFi have been removed. */
+        val connectionType: org.dhis2.sensor.connection.ConnectionType =
+            org.dhis2.sensor.connection.ConnectionType.BLE,
     ) : FormIntent()
 }

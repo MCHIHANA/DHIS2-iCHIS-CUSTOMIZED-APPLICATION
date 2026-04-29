@@ -40,6 +40,7 @@ import org.dhis2.form.ui.provider.HintProviderImpl
 import org.dhis2.form.ui.provider.KeyboardActionProviderImpl
 import org.dhis2.form.ui.provider.LegendValueProviderImpl
 import org.dhis2.form.ui.provider.UiEventTypesProviderImpl
+
 import org.dhis2.mobile.commons.customintents.CustomIntentRepository
 import org.dhis2.mobile.commons.customintents.CustomIntentRepositoryImpl
 import org.dhis2.mobile.commons.providers.FieldErrorMessageProvider
@@ -65,9 +66,14 @@ object Injector {
                 useCompose,
             ),
             provideDispatchers(),
+            provideBleManager(context),
+            provideSensorConfigRepository(context),
             openErrorLocation,
             provideFormResultDialogProvider(context),
         )
+
+    private fun provideSensorConfigRepository(context: Context) = 
+        org.dhis2.sensor.config.SensorConfigRepository(context, org.dhis2.sensor.config.SensorConfigApi(provideD2()))
 
     private fun provideFormResultDialogProvider(context: Context) =
         FormResultDialogProvider(
@@ -297,4 +303,7 @@ object Injector {
         )
 
     private fun provideColorUtils() = ColorUtils()
+
+    private fun provideBleManager(context: Context): org.dhis2.sensor.ble.BleManager =
+        org.dhis2.sensor.ble.BleManager(context, provideSensorConfigRepository(context))
 }

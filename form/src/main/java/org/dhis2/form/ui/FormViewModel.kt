@@ -2,6 +2,7 @@ package org.dhis2.form.ui
 
 import android.os.Handler
 import android.os.Looper
+import android.bluetooth.BluetoothDevice
 import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.ViewModel
@@ -56,6 +57,8 @@ import org.dhis2.form.ui.event.RecyclerViewUiEvents
 import org.dhis2.form.ui.idling.FormCountingIdlingResource
 import org.dhis2.form.ui.intent.FormIntent
 import org.dhis2.form.ui.provider.FormResultDialogProvider
+import org.dhis2.sensor.ble.BleManager
+import org.dhis2.sensor.config.SensorConfigRepository
 import org.dhis2.mobile.commons.model.CustomIntentRequestArgumentModel
 import org.dhis2.mobile.commons.providers.CustomIntentFailure
 import org.dhis2.mobile.commons.validation.validators.FieldMaskValidator
@@ -77,6 +80,8 @@ import java.time.format.DateTimeParseException
 class FormViewModel(
     private val repository: FormRepository,
     private val dispatcher: DispatcherProvider,
+    val bleManager: BleManager,
+    val sensorConfigRepository: SensorConfigRepository,
     private val geometryController: GeometryController = GeometryController(GeometryParserImpl()),
     private val openErrorLocation: Boolean = false,
     private val resultDialogUiProvider: FormResultDialogProvider,
@@ -95,6 +100,8 @@ class FormViewModel(
 
     private val _isFieldScanning = MutableStateFlow<Map<String, Boolean>>(emptyMap())
     val isFieldScanning: StateFlow<Map<String, Boolean>> = _isFieldScanning.asStateFlow()
+
+    val foundDevices: StateFlow<List<BluetoothDevice>> = bleManager.devices
 
     var previousActionItem: RowAction? = null
 
@@ -140,6 +147,10 @@ class FormViewModel(
             .distinctUntilChanged { old, new ->
                 if (old is FormIntent.OnFinish && new is FormIntent.OnFinish) {
                     false
+                } else if (old is FormIntent.OnSensorScanRequested || new is FormIntent.OnSensorScanRequested) {
+                    // Never deduplicate sensor scan requests — the user may open
+                    // the dialog multiple times and each open must start a fresh scan
+                    false
                 } else {
                     old == new
                 }
@@ -164,6 +175,48 @@ class FormViewModel(
         }
 
         loadData()
+        observeSensorData()
+    }
+
+    /** UID of the field currently waiting for a sensor reading. Set when scan starts. */
+    private var activeSensorFieldUid: String? = null
+
+    private fun observeSensorData() {
+        bleManager.sensorData.onEach { data ->
+            data?.let { (uuid, value) ->
+                // Use the field UID captured at scan-start time.
+                // Fall back to the currently focused item if no scan is active.
+                val fieldUid = activeSensorFieldUid
+                    ?: repository.currentFocusedItem()?.uid
+                    ?: return@let
+
+                // Only reject if a config exists AND the UUID explicitly mismatches.
+                val expectedConfig = sensorConfigRepository.getConfigByDataElement(fieldUid)
+                if (expectedConfig != null &&
+                    expectedConfig.serviceUUID != null &&
+                    expectedConfig.serviceUUID.uppercase() != uuid.uppercase()
+                ) {
+                    Timber.w("UUID mismatch: expected ${expectedConfig.serviceUUID}, got $uuid — skipping")
+                    return@let
+                }
+
+                submitIntent(FormIntent.OnSave(fieldUid, value, ValueType.TEXT))
+                _sensorStatuses.update { it + (fieldUid to "Data received: $value") }
+                _isFieldScanning.update { it + (fieldUid to false) }
+                activeSensorFieldUid = null // clear after successful read
+            }
+        }.launchIn(viewModelScope)
+
+        bleManager.connectionState.onEach { state ->
+             val fieldUid = repository.currentFocusedItem()?.uid ?: return@onEach
+             val status = when(state) {
+                 org.dhis2.sensor.ble.BleManager.ConnectionState.CONNECTED -> "Connected"
+                 org.dhis2.sensor.ble.BleManager.ConnectionState.CONNECTING -> "Connecting..."
+                 org.dhis2.sensor.ble.BleManager.ConnectionState.DISCONNECTED -> "Disconnected"
+                 org.dhis2.sensor.ble.BleManager.ConnectionState.DISCONNECTING -> "Disconnecting..."
+             }
+             _sensorStatuses.update { it + (fieldUid to status) }
+        }.launchIn(viewModelScope)
     }
 
     private fun displayResult(result: Pair<RowAction, StoreResult>) {
@@ -611,6 +664,13 @@ class FormViewModel(
                     actionType = ActionType.ON_ADD_IMAGE_FINISHED,
                 )
 
+            is FormIntent.OnAddImageFinished ->
+                createRowAction(
+                    uid = intent.uid,
+                    value = null,
+                    actionType = ActionType.ON_ADD_IMAGE_FINISHED,
+                )
+
             is FormIntent.OnStoreFile ->
                 createRowAction(
                     uid = intent.uid,
@@ -647,7 +707,7 @@ class FormViewModel(
                 createRowAction(
                     uid = intent.uid,
                     value = null,
-                    extraData = intent.connectionType,
+                    extraData = intent.connectionType?.name,
                     actionType = ActionType.ON_SENSOR_SCAN,
                 )
         }
@@ -1044,7 +1104,6 @@ class FormViewModel(
                 }.await()
             try {
                 _items.postValue(result)
-                autoFillMedicalFields(result)
             } catch (e: Exception) {
                 Timber.e(e)
                 _items.postValue(emptyList())
@@ -1098,77 +1157,33 @@ class FormViewModel(
 
     private fun handleOnSensorScanRequested(action: RowAction): StoreResult {
         val uid = action.id
-        val connectionType = action.extraData ?: "Bluetooth"
-        val field = _items.value?.find { it.uid == uid } ?: return StoreResult(uid, ValueStoreResult.VALUE_HAS_NOT_CHANGED)
 
+        activeSensorFieldUid = uid  // remember which field is waiting for the reading
         _isFieldScanning.update { it + (uid to true) }
-        _sensorStatuses.update { it + (uid to "Searching...") }
+        _sensorStatuses.update { it + (uid to "Waiting for sensor...") }
 
-        viewModelScope.launch {
-            try {
-                Timber.d("Scanning via $connectionType for $uid")
-                val sensorType = when {
-                    field.label.contains("Temperature", ignoreCase = true) -> SensorType.TEMPERATURE
-                    field.label.contains("Weight", ignoreCase = true) -> SensorType.WEIGHT
-                    field.label.contains("Heart Rate", ignoreCase = true) -> SensorType.HEART_RATE
-                    field.label.contains("Systolic", ignoreCase = true) -> SensorType.SYSTOLIC
-                    field.label.contains("Diastolic", ignoreCase = true) -> SensorType.DIASTOLIC
-                    else -> SensorType.TEMPERATURE
-                }
-
-                val value = SensorConnectionManager.scan(sensorType)
-                Timber.d("Value received: $value")
-                
-                if (value != null) {
-                    _sensorStatuses.update { it + (uid to "Sensor connected") }
-                    handleOnSaveAction(action.copy(value = value, type = ActionType.ON_SAVE))
-                } else {
-                    _sensorStatuses.update { it + (uid to "Sensor not found. Enter manually.") }
-                }
-            } catch (e: Exception) {
-                Timber.e(e, "Error scanning")
-                _sensorStatuses.update { it + (uid to "Error. Enter manually.") }
-            } finally {
-                _isFieldScanning.update { it + (uid to false) }
-            }
-        }
+        // Continuous scan — no timeout. Scan runs until the sensor is detected or
+        // the user dismisses the dialog (which calls bleManager.stopScan()).
+        bleManager.startScan()
 
         return StoreResult(uid, ValueStoreResult.VALUE_CHANGED)
     }
 
+    fun connectToDevice(device: BluetoothDevice) {
+        org.dhis2.sensor.connection.ConnectionTimeoutManager.cancelTimeout()
+        bleManager.connectDevice(device)
+    }
+
     /**
-     * Automatically populates medical fields (Temperature, Weight, etc.) using simulated
-     * sensor data if the fields are currently empty and editable.
+     * Starts a BLE scan for the given field directly — bypasses the intent
+     * pipeline to avoid deduplication and emission-before-collection race conditions.
+     * Called from the bottom sheet's LaunchedEffect(Unit).
      */
-    private fun autoFillMedicalFields(fields: List<FieldUiModel>) {
-        fields.forEach { field ->
-            if (field.value.isNullOrEmpty() && field.editable) {
-                val sensorType = when {
-                    field.label.contains("Temperature", ignoreCase = true) -> SensorType.TEMPERATURE
-                    field.label.contains("Weight", ignoreCase = true) -> SensorType.WEIGHT
-                    field.label.contains("Heart Rate", ignoreCase = true) -> SensorType.HEART_RATE
-                    field.label.contains("Systolic", ignoreCase = true) -> SensorType.SYSTOLIC
-                    field.label.contains("Diastolic", ignoreCase = true) -> SensorType.DIASTOLIC
-                    else -> null
-                }
-                
-                sensorType?.let { type ->
-                    Timber.d("Auto-filling field ${field.label} using sensor")
-                    viewModelScope.launch {
-                        val value = SensorConnectionManager.scan(type)
-                        submitIntent(
-                            FormIntent.OnSave(
-                                uid = field.uid,
-                                value = value,
-                                valueType = field.valueType,
-                                fieldMask = field.fieldMask,
-                                allowFutureDates = field.allowFutureDates,
-                            ),
-                        )
-                    }
-                }
-            }
-        }
+    fun startSensorScan(fieldUid: String) {
+        activeSensorFieldUid = fieldUid
+        _isFieldScanning.update { it + (fieldUid to true) }
+        _sensorStatuses.update { it + (fieldUid to "Waiting for sensor...") }
+        bleManager.startScan()
     }
 
     companion object {

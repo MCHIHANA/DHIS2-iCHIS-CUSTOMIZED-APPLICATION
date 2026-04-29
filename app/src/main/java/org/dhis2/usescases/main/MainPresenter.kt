@@ -40,6 +40,7 @@ import org.dhis2.data.service.VersionRepository
 import org.dhis2.data.service.workManager.WorkManagerController
 import org.dhis2.data.service.workManager.WorkerItem
 import org.dhis2.data.service.workManager.WorkerType
+import org.dhis2.sensor.config.SensorConfigRepository
 import org.dhis2.usescases.login.SyncIsPerformedInteractor
 import org.dhis2.usescases.main.domain.LogoutUser
 import org.dhis2.usescases.settings.DeleteUserData
@@ -76,6 +77,7 @@ class MainPresenter(
     val dispatcherProvider: DispatcherProvider,
     private val forceToNotSynced: Boolean,
     private val logoutUser: LogoutUser,
+    private val sensorConfigRepository: SensorConfigRepository,
 ) : CoroutineScope {
     private var job = Job()
     override val coroutineContext: CoroutineContext
@@ -137,6 +139,13 @@ class MainPresenter(
                 ),
         )
         trackDhis2Server()
+        fetchSensorConfig()
+    }
+
+    private fun fetchSensorConfig() {
+        launch {
+            sensorConfigRepository.fetchSensorConfig()
+        }
     }
 
     fun initFilters() {

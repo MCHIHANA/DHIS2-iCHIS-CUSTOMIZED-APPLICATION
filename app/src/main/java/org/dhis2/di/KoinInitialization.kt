@@ -8,6 +8,7 @@ import org.dhis2.data.biometric.biometricModule
 import org.dhis2.mobile.aggregates.di.aggregatesModule
 import org.dhis2.mobile.commons.di.commonsModule
 import org.dhis2.mobile.login.main.di.loginModule
+import org.dhis2.sensor.config.sensorModule
 import org.dhis2.usescases.datasets.di.dataSetModules
 import org.dhis2.usescases.settingsprogram.di.settingsProgramModule
 import org.dhis2.utils.analytics.matomo.matomoModule
@@ -33,6 +34,7 @@ object KoinInitialization {
                 settingsProgramModule,
                 biometricModule,
                 matomoModule,
+                sensorModule,
             )
         }
     }
