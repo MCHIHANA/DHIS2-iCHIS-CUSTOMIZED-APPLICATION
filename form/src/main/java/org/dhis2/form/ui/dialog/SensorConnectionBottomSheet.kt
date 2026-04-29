@@ -1,13 +1,18 @@
 package org.dhis2.form.ui.dialog
 
+import android.Manifest
 import android.annotation.SuppressLint
 import android.bluetooth.BluetoothDevice
+import android.content.pm.PackageManager
+import android.os.Build
 import android.os.Bundle
 import android.util.Log
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.view.Window
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -24,15 +29,20 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.ComposeView
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.ViewCompositionStrategy
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.sp
+import androidx.core.content.ContextCompat
 import androidx.fragment.app.DialogFragment
 import androidx.fragment.app.FragmentManager
 import kotlinx.coroutines.delay
@@ -48,6 +58,17 @@ import org.hisp.dhis.mobile.ui.designsystem.theme.DHIS2Theme
 import org.hisp.dhis.mobile.ui.designsystem.theme.Spacing
 
 const val SENSOR_DIALOG_TAG = "SensorConnectionBottomSheet"
+
+/** Permissions required for BLE scanning. Android 12+ needs BLUETOOTH_SCAN/CONNECT;
+ *  older versions need ACCESS_FINE_LOCATION. */
+private val BLE_PERMISSIONS = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+    arrayOf(
+        Manifest.permission.BLUETOOTH_SCAN,
+        Manifest.permission.BLUETOOTH_CONNECT,
+    )
+} else {
+    arrayOf(Manifest.permission.ACCESS_FINE_LOCATION)
+}
 
 class SensorConnectionBottomSheet(
     private val fieldUid: String,
@@ -93,24 +114,46 @@ fun SensorConnectionScreen(
     viewModel: FormViewModel,
     onDismiss: () -> Unit,
 ) {
+    val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
     val isScanningMap by viewModel.isFieldScanning.collectAsState()
     val isScanning = isScanningMap[fieldUid] ?: false
     val sensorStatuses by viewModel.sensorStatuses.collectAsState()
     val status = sensorStatuses[fieldUid] ?: ""
 
-    // Start scan immediately when dialog opens — no tap required, no intent pipeline race
+    var permissionDenied by remember { mutableStateOf(false) }
+
+    // Request BLE permissions then start scan
+    val permissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestMultiplePermissions(),
+    ) { results ->
+        if (results.values.all { it }) {
+            Log.d("SensorBottomSheet", "BLE permissions granted — starting scan")
+            viewModel.startSensorScan(fieldUid)
+        } else {
+            Log.w("SensorBottomSheet", "BLE permissions denied")
+            permissionDenied = true
+        }
+    }
+
+    // Check permissions and start scan immediately when dialog opens
     LaunchedEffect(Unit) {
         Log.d("SensorBottomSheet", "Auto-starting BLE scan for field: $fieldUid")
-        // Set scanning state in ViewModel first so the UI shows the spinner
-        viewModel.startSensorScan(fieldUid)
+        val allGranted = BLE_PERMISSIONS.all {
+            ContextCompat.checkSelfPermission(context, it) == PackageManager.PERMISSION_GRANTED
+        }
+        if (allGranted) {
+            viewModel.startSensorScan(fieldUid)
+        } else {
+            permissionLauncher.launch(BLE_PERMISSIONS)
+        }
     }
 
     // Auto-dismiss once data is received
     LaunchedEffect(status) {
         if (status.startsWith("Data received")) {
-            Log.d("SensorBottomSheet", "Data received — dismissing dialog: $status")
-            delay(1200) // brief pause so user sees the value
+            Log.d("SensorBottomSheet", "Data received — dismissing: $status")
+            delay(1200)
             onDismiss()
         }
     }
@@ -135,25 +178,20 @@ fun SensorConnectionScreen(
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
                 when {
-                    // Data received — show value
-                    status.startsWith("Data received") -> {
-                        BluetoothSensorStatus(status = status, isSuccess = true)
-                    }
-
-                    // Error state
-                    status == "No connections available" -> {
-                        BluetoothSensorStatus(status = "No sensor found. Try again.", isSuccess = false)
-                    }
-
-                    // Connecting
-                    status == "Connecting..." -> {
-                        BluetoothSensorConnecting()
-                    }
-
-                    // Scanning (default — shown immediately on open)
-                    else -> {
-                        BluetoothSensorSearching()
-                    }
+                    permissionDenied -> BluetoothSensorStatus(
+                        status = "Bluetooth permission denied.\nPlease grant it in Settings.",
+                        isSuccess = false,
+                    )
+                    status.startsWith("Data received") -> BluetoothSensorStatus(
+                        status = status,
+                        isSuccess = true,
+                    )
+                    status == "No connections available" -> BluetoothSensorStatus(
+                        status = "No sensor found. Try again.",
+                        isSuccess = false,
+                    )
+                    status == "Connecting..." -> BluetoothSensorConnecting()
+                    else -> BluetoothSensorSearching()
                 }
             }
         },
@@ -173,7 +211,6 @@ fun SensorConnectionScreen(
     )
 }
 
-/** Scanning — spinner shown immediately when dialog opens. */
 @Composable
 private fun BluetoothSensorSearching() {
     Column(
@@ -207,7 +244,6 @@ private fun BluetoothSensorSearching() {
     }
 }
 
-/** Connecting state — GATT connection in progress. */
 @Composable
 private fun BluetoothSensorConnecting() {
     Column(
@@ -228,7 +264,6 @@ private fun BluetoothSensorConnecting() {
     }
 }
 
-/** Data received or error state. */
 @Composable
 private fun BluetoothSensorStatus(status: String, isSuccess: Boolean) {
     Column(
@@ -246,7 +281,6 @@ private fun BluetoothSensorStatus(status: String, isSuccess: Boolean) {
     }
 }
 
-/** Device row — kept for optional manual-selection fallback. */
 @SuppressLint("MissingPermission")
 @Composable
 fun DeviceRow(device: BluetoothDevice, onClick: () -> Unit) {
@@ -265,14 +299,8 @@ fun DeviceRow(device: BluetoothDevice, onClick: () -> Unit) {
         )
         Spacer(modifier = Modifier.size(Spacing.Spacing16))
         Column {
-            Text(
-                text = device.name ?: "Unknown Device",
-                style = MaterialTheme.typography.bodyLarge,
-            )
-            Text(
-                text = device.address,
-                style = MaterialTheme.typography.bodySmall,
-            )
+            Text(text = device.name ?: "Unknown Device", style = MaterialTheme.typography.bodyLarge)
+            Text(text = device.address, style = MaterialTheme.typography.bodySmall)
         }
     }
 }
