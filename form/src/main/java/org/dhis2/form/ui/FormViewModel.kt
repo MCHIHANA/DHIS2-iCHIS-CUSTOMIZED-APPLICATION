@@ -1141,37 +1141,18 @@ class FormViewModel(
 
     private fun handleOnSensorScanRequested(action: RowAction): StoreResult {
         val uid = action.id
-        val connectionTypeStr = action.extraData
-        val connectionType = connectionTypeStr?.let {
-            try {
-                org.dhis2.sensor.connection.ConnectionType.valueOf(it)
-            } catch (e: IllegalArgumentException) {
-                org.dhis2.sensor.connection.ConnectionType.BLE // Default to BLE
-            }
-        } ?: org.dhis2.sensor.connection.ConnectionType.BLE // Default to BLE
 
         _isFieldScanning.update { it + (uid to true) }
+        _sensorStatuses.update { it + (uid to "Waiting for sensor...") }
 
-        // Start timeout for 5 minutes
+        // Auto-stop scanning after timeout
         org.dhis2.sensor.connection.ConnectionTimeoutManager.startTimeout(viewModelScope) {
             _isFieldScanning.update { it + (uid to false) }
             _sensorStatuses.update { it + (uid to "No connections available") }
         }
 
-        when (connectionType) {
-            org.dhis2.sensor.connection.ConnectionType.BLE -> {
-                _sensorStatuses.update { it + (uid to "Scanning BLE devices...") }
-                bleManager.startScan()
-            }
-            org.dhis2.sensor.connection.ConnectionType.USB -> {
-                _sensorStatuses.update { it + (uid to "Scanning USB devices...") }
-                // USB scanning will be implemented via ConnectionManager
-            }
-            org.dhis2.sensor.connection.ConnectionType.WIFI -> {
-                _sensorStatuses.update { it + (uid to "Scanning WiFi devices...") }
-                // WiFi scanning will be implemented via ConnectionManager
-            }
-        }
+        // Always BLE — USB and WiFi have been removed
+        bleManager.startScan()
 
         return StoreResult(uid, ValueStoreResult.VALUE_CHANGED)
     }

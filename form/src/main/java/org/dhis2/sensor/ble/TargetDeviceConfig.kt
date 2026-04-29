@@ -1,5 +1,8 @@
 package org.dhis2.sensor.ble
 
+/**
+ * Kept for backward-compatibility. Prefer [KnownDevices] for multi-sensor support.
+ */
 object TargetDeviceConfig {
-    const val TEMPERATURE_SENSOR_MAC = "C0:26:DA:1B:06:A4"
+    const val TEMPERATURE_SENSOR_MAC = KnownDevices.TEMP_SENSOR
 }

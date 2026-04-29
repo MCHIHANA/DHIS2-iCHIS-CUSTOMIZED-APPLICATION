@@ -5,11 +5,10 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.view.Window
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.Icon
@@ -19,11 +18,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.ComposeView
 import androidx.compose.ui.platform.ViewCompositionStrategy
 import androidx.compose.ui.res.painterResource
-import androidx.compose.ui.unit.dp
 import androidx.fragment.app.DialogFragment
 import androidx.fragment.app.FragmentManager
 import kotlinx.coroutines.delay
@@ -39,13 +36,13 @@ import org.hisp.dhis.mobile.ui.designsystem.theme.Spacing
 const val CONNECTION_SELECTION_TAG = "ConnectionSelectionBottomSheet"
 
 /**
- * Bottom sheet for selecting sensor connection type
- * Shows options: Bluetooth, USB, WiFi
+ * Bottom sheet for initiating a Bluetooth sensor connection.
+ * USB and WiFi options have been removed — Bluetooth is the only supported transport.
  */
 class ConnectionSelectionBottomSheet(
     private val fieldUid: String,
     private val onConnectionTypeSelected: (ConnectionType) -> Unit,
-    private val onDismiss: () -> Unit = {}
+    private val onDismiss: () -> Unit = {},
 ) : DialogFragment() {
 
     override fun onCreateDialog(savedInstanceState: Bundle?): android.app.Dialog {
@@ -58,7 +55,7 @@ class ConnectionSelectionBottomSheet(
     override fun onCreateView(
         inflater: LayoutInflater,
         container: ViewGroup?,
-        savedInstanceState: Bundle?
+        savedInstanceState: Bundle?,
     ): View = ComposeView(requireContext()).apply {
         setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnViewTreeLifecycleDestroyed)
         setContent {
@@ -71,7 +68,7 @@ class ConnectionSelectionBottomSheet(
                     onDismiss = {
                         onDismiss()
                         dismissAllowingStateLoss()
-                    }
+                    },
                 )
             }
         }
@@ -85,15 +82,15 @@ class ConnectionSelectionBottomSheet(
 @Composable
 fun ConnectionSelectionScreen(
     onConnectionTypeSelected: (ConnectionType) -> Unit,
-    onDismiss: () -> Unit
+    onDismiss: () -> Unit,
 ) {
     val coroutineScope = rememberCoroutineScope()
 
     BottomSheetShell(
         uiState = BottomSheetShellUIState(
-            title = "Select Connection Type",
-            subtitle = "Choose how to connect to your sensor",
-            showTopSectionDivider = true
+            title = "Connect Sensor",
+            subtitle = "Bluetooth Low Energy (BLE)",
+            showTopSectionDivider = true,
         ),
         onDismiss = {
             coroutineScope.launch {
@@ -105,34 +102,26 @@ fun ConnectionSelectionScreen(
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(Spacing.Spacing16)
+                    .padding(Spacing.Spacing16),
+                horizontalAlignment = Alignment.CenterHorizontally,
             ) {
-                // Bluetooth option
-                ConnectionOptionRow(
-                    icon = R.drawable.ic_bluetooth,
-                    label = "Bluetooth",
-                    description = "Connect via Bluetooth Low Energy",
-                    onClick = { onConnectionTypeSelected(ConnectionType.BLE) }
+                Icon(
+                    painter = painterResource(id = R.drawable.ic_bluetooth),
+                    contentDescription = null,
+                    modifier = Modifier.size(Spacing.Spacing48),
+                    tint = MaterialTheme.colorScheme.primary,
                 )
-
-                Spacer(modifier = Modifier.size(Spacing.Spacing8))
-
-                // USB option
-                ConnectionOptionRow(
-                    icon = R.drawable.ic_usb,
-                    label = "USB",
-                    description = "Connect via USB cable",
-                    onClick = { onConnectionTypeSelected(ConnectionType.USB) }
+                Spacer(modifier = Modifier.height(Spacing.Spacing8))
+                Text(
+                    text = "The app will automatically detect and connect to your medical sensor via Bluetooth.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
-
-                Spacer(modifier = Modifier.size(Spacing.Spacing8))
-
-                // WiFi option
-                ConnectionOptionRow(
-                    icon = R.drawable.ic_wifi,
-                    label = "WiFi",
-                    description = "Connect via wireless network",
-                    onClick = { onConnectionTypeSelected(ConnectionType.WIFI) }
+                Spacer(modifier = Modifier.height(Spacing.Spacing16))
+                Button(
+                    modifier = Modifier.fillMaxWidth(),
+                    text = "START BLUETOOTH SCAN",
+                    onClick = { onConnectionTypeSelected(ConnectionType.BLE) },
                 )
             }
         },
@@ -145,48 +134,8 @@ fun ConnectionSelectionScreen(
                         delay(100)
                         onDismiss()
                     }
-                }
+                },
             )
-        }
+        },
     )
-}
-
-@Composable
-private fun ConnectionOptionRow(
-    icon: Int,
-    label: String,
-    description: String,
-    onClick: () -> Unit
-) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable(onClick = onClick)
-            .padding(vertical = Spacing.Spacing12, horizontal = Spacing.Spacing8),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Icon(
-            painter = painterResource(id = icon),
-            contentDescription = null,
-            modifier = Modifier.size(32.dp),
-            tint = MaterialTheme.colorScheme.primary
-        )
-
-        Column(
-            modifier = Modifier
-                .padding(start = Spacing.Spacing16)
-                .weight(1f)
-        ) {
-            Text(
-                text = label,
-                style = MaterialTheme.typography.bodyLarge,
-                color = MaterialTheme.colorScheme.onSurface
-            )
-            Text(
-                text = description,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-        }
-    }
 }

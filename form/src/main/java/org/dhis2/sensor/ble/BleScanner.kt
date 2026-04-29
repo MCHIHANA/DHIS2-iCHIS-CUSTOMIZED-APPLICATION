@@ -18,29 +18,31 @@ private const val TAG = "BLE_SCAN"
 class BleScanner(private val context: Context) {
 
     private val bluetoothAdapter: BluetoothAdapter? by lazy {
-        val bluetoothManager = context.getSystemService(Context.BLUETOOTH_SERVICE) as BluetoothManager
+        val bluetoothManager =
+            context.getSystemService(Context.BLUETOOTH_SERVICE) as BluetoothManager
         bluetoothManager.adapter
     }
 
     private val scanner by lazy { bluetoothAdapter?.bluetoothLeScanner }
 
-    private val devices = mutableListOf<BluetoothDevice>()
+    private val seenDevices = mutableListOf<BluetoothDevice>()
     private var scanCallback: ScanCallback? = null
     private val timeoutHandler = Handler(Looper.getMainLooper())
 
     /**
-     * Starts a BLE scan. When the target device ([TargetDeviceConfig.TEMPERATURE_SENSOR_MAC])
-     * is found, [onTargetFound] is invoked and the scan stops automatically.
-     * The scan also stops after [SCAN_TIMEOUT_MS] milliseconds if the device is not found.
+     * Starts a BLE scan.
      *
-     * [onDeviceFound] is still called for every discovered device so the existing device-list
-     * UI continues to work.
+     * When any device in [KnownDevices.ALL] is detected the scan stops immediately and
+     * [onTargetFound] is invoked for automatic connection.
+     * Every discovered device is also reported via [onDeviceFound] so existing device-list
+     * UI keeps working.
+     * The scan auto-stops after [SCAN_TIMEOUT_MS] ms if no known device appears.
      */
     fun startScan(
         onDeviceFound: (BluetoothDevice) -> Unit,
         onTargetFound: ((BluetoothDevice) -> Unit)? = null,
     ) {
-        if (scanCallback != null) return // Already scanning
+        if (scanCallback != null) return // already scanning
 
         val callback = object : ScanCallback() {
             override fun onScanResult(callbackType: Int, result: ScanResult) {
@@ -49,13 +51,13 @@ class BleScanner(private val context: Context) {
 
                 Log.d(TAG, "Found device: $address")
 
-                if (!devices.contains(device)) {
-                    devices.add(device)
+                if (!seenDevices.contains(device)) {
+                    seenDevices.add(device)
                     onDeviceFound(device)
                 }
 
-                if (address == TargetDeviceConfig.TEMPERATURE_SENSOR_MAC) {
-                    Log.d(TAG, "Target device found!")
+                if (address in KnownDevices.ALL) {
+                    Log.d(TAG, "Known sensor detected: $address")
                     stopScan()
                     onTargetFound?.invoke(device)
                 }
@@ -64,12 +66,13 @@ class BleScanner(private val context: Context) {
 
         scanCallback = callback
         scanner?.startScan(callback)
+        Log.d(TAG, "Scan started")
 
         // Auto-stop after timeout to prevent infinite scanning
         timeoutHandler.postDelayed({
             if (scanCallback != null) {
                 stopScan()
-                Log.d(TAG, "Scan timeout after ${SCAN_TIMEOUT_MS / 1000} seconds")
+                Log.d(TAG, "Scan timeout after ${SCAN_TIMEOUT_MS / 1000}s — no known sensor found")
             }
         }, SCAN_TIMEOUT_MS)
     }
@@ -79,6 +82,7 @@ class BleScanner(private val context: Context) {
         scanCallback?.let {
             scanner?.stopScan(it)
             scanCallback = null
+            Log.d(TAG, "Scan stopped")
         }
     }
 }
