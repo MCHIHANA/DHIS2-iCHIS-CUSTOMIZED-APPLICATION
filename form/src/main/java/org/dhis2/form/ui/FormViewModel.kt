@@ -147,6 +147,10 @@ class FormViewModel(
             .distinctUntilChanged { old, new ->
                 if (old is FormIntent.OnFinish && new is FormIntent.OnFinish) {
                     false
+                } else if (old is FormIntent.OnSensorScanRequested || new is FormIntent.OnSensorScanRequested) {
+                    // Never deduplicate sensor scan requests — the user may open
+                    // the dialog multiple times and each open must start a fresh scan
+                    false
                 } else {
                     old == new
                 }
@@ -1168,6 +1172,18 @@ class FormViewModel(
     fun connectToDevice(device: BluetoothDevice) {
         org.dhis2.sensor.connection.ConnectionTimeoutManager.cancelTimeout()
         bleManager.connectDevice(device)
+    }
+
+    /**
+     * Starts a BLE scan for the given field directly — bypasses the intent
+     * pipeline to avoid deduplication and emission-before-collection race conditions.
+     * Called from the bottom sheet's LaunchedEffect(Unit).
+     */
+    fun startSensorScan(fieldUid: String) {
+        activeSensorFieldUid = fieldUid
+        _isFieldScanning.update { it + (fieldUid to true) }
+        _sensorStatuses.update { it + (fieldUid to "Waiting for sensor...") }
+        bleManager.startScan()
     }
 
     companion object {

@@ -39,8 +39,6 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import org.dhis2.form.R
 import org.dhis2.form.ui.FormViewModel
-import org.dhis2.form.ui.intent.FormIntent
-import org.dhis2.sensor.connection.ConnectionType
 import org.hisp.dhis.mobile.ui.designsystem.component.BottomSheetShell
 import org.hisp.dhis.mobile.ui.designsystem.component.Button
 import org.hisp.dhis.mobile.ui.designsystem.component.ProgressIndicator
@@ -101,15 +99,11 @@ fun SensorConnectionScreen(
     val sensorStatuses by viewModel.sensorStatuses.collectAsState()
     val status = sensorStatuses[fieldUid] ?: ""
 
-    // Start scan immediately when dialog opens — no tap required
+    // Start scan immediately when dialog opens — no tap required, no intent pipeline race
     LaunchedEffect(Unit) {
         Log.d("SensorBottomSheet", "Auto-starting BLE scan for field: $fieldUid")
-        viewModel.submitIntent(
-            FormIntent.OnSensorScanRequested(
-                uid = fieldUid,
-                connectionType = ConnectionType.BLE,
-            ),
-        )
+        // Set scanning state in ViewModel first so the UI shows the spinner
+        viewModel.startSensorScan(fieldUid)
     }
 
     // Auto-dismiss once data is received
