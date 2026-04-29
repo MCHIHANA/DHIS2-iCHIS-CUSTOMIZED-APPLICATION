@@ -10,11 +10,6 @@ import org.dhis2.sensor.config.SensorConfigRepository
 
 private const val TAG = "BleManager"
 
-/** UUID of the standard Temperature Measurement characteristic — used as the key
- *  when emitting advertisement-sourced temperature values so the FormViewModel
- *  observer treats them identically to GATT-sourced values. */
-private const val TEMP_CHAR_UUID = "00002A1C-0000-1000-8000-00805F9B34FB"
-
 class BleManager(
     private val context: Context,
     private val sensorConfigRepository: SensorConfigRepository,
@@ -30,8 +25,7 @@ class BleManager(
 
     /**
      * Emits sensor readings as (characteristicUUID, parsedValue) pairs.
-     * Populated by both the advertisement path (FORA IR42) and the GATT path
-     * (all other sensors), so FormViewModel needs no changes.
+     * Observed by FormViewModel to auto-fill the focused form field.
      */
     private val _sensorData = MutableStateFlow<Pair<String, String>?>(null)
     val sensorData: StateFlow<Pair<String, String>?> = _sensorData.asStateFlow()
@@ -47,16 +41,18 @@ class BleManager(
     )
 
     /**
-     * Starts a continuous BLE scan.
+     * Starts a continuous BLE scan filtered to the Health Thermometer service
+     * (UUID 0x1809). When a matching device is detected the scan stops and a
+     * GATT connection is established to receive the temperature measurement.
      *
-     * **FORA IR42 (advertisement path — no GATT):**
-     * When a FORA device is detected the scanner reads the temperature directly
-     * from the advertisement packet, emits it to [_sensorData], and stops.
-     * No GATT connection is made.
-     *
-     * **Other known sensors (GATT path):**
-     * When a known MAC is detected the scanner stops and [connectDevice] is
-     * called to establish a GATT connection and read via notifications.
+     * Flow:
+     *   1. User taps Temperature field → [startScan] is called
+     *   2. User turns ON the thermometer
+     *   3. Thermometer advertises service UUID 0x1809
+     *   4. Scanner detects it → stops scan → connects via GATT
+     *   5. GATT discovers services → subscribes to 0x2A1C (INDICATE)
+     *   6. Thermometer sends measurement → [_sensorData] is updated
+     *   7. FormViewModel observer saves the value to the form field
      */
     fun startScan() {
         _devices.value = emptyList()
@@ -69,19 +65,8 @@ class BleManager(
                     _devices.value = currentList
                 }
             },
-            onAdvertisementTemperature = { temperature ->
-                // Temperature read directly from advertisement — no GATT needed.
-                // Emit using the standard Temperature Measurement UUID so the
-                // FormViewModel observer handles it like any other sensor reading.
-                Log.d(TAG, "Advertisement temperature received: $temperature °C")
-                _connectionState.value = ConnectionState.CONNECTED
-                _sensorData.value = Pair(TEMP_CHAR_UUID, "%.1f".format(temperature))
-                // Mark as disconnected after emitting — sensor has powered off
-                _connectionState.value = ConnectionState.DISCONNECTED
-            },
             onTargetFound = { device ->
-                // GATT fallback for non-FORA known-MAC sensors
-                Log.d(TAG, "Auto-connecting via GATT to: ${device.address}")
+                Log.d(TAG, "Health Thermometer detected — connecting to ${device.address}")
                 connectDevice(device)
             },
         )
