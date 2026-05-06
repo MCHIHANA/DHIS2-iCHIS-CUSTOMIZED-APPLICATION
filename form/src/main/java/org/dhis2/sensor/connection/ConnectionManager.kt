@@ -21,7 +21,7 @@ class ConnectionManager(
 
     val devices: StateFlow<List<BluetoothDevice>> = bleManager.devices
     val connectionState: StateFlow<BleConnectionManager.ConnectionState> = bleManager.connectionState
-    val sensorData: StateFlow<Pair<String, String>?> = bleManager.sensorData
+    val sensorData: StateFlow<List<Pair<String, String>>> = bleManager.sensorData
 
     private val _isScanning = MutableStateFlow(false)
     val isScanning: StateFlow<Boolean> = _isScanning.asStateFlow()
