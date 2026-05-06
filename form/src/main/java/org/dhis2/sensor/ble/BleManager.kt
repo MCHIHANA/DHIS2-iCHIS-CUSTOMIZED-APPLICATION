@@ -2,8 +2,6 @@ package org.dhis2.sensor.ble
 
 import android.bluetooth.BluetoothDevice
 import android.content.Context
-import android.os.Handler
-import android.os.Looper
 import android.util.Log
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -18,7 +16,9 @@ class BleManager(
 ) {
 
     private val bleScanner = BleScanner(context)
-    private val mainHandler = Handler(Looper.getMainLooper())
+
+    /** Guard against duplicate connections when the scan fires multiple times for the same device. */
+    @Volatile private var isConnecting = false
 
     private val _devices = MutableStateFlow<List<BluetoothDevice>>(emptyList())
     val devices: StateFlow<List<BluetoothDevice>> = _devices.asStateFlow()
@@ -27,42 +27,27 @@ class BleManager(
     val connectionState: StateFlow<ConnectionState> = _connectionState.asStateFlow()
 
     /**
-     * Emits one or more sensor readings as a list of (characteristicUUID, parsedValue) pairs.
-     *
-     * Single-value sensors (thermometer) emit a list with one entry.
-     * Multi-value sensors (oximeter) emit a list with two entries:
-     *   - ("SPO2",  "98")   — SpO2 percentage
-     *   - ("PULSE", "72")   — Pulse rate in bpm
-     *
-     * FormViewModel observes this and routes each reading to the correct field.
+     * Emits sensor readings as (key, value) pairs.
+     * Keys: "SPO2", "PULSE" for oximeter; characteristic UUID string for thermometer.
      */
     private val _sensorData = MutableStateFlow<List<Pair<String, String>>>(emptyList())
     val sensorData: StateFlow<List<Pair<String, String>>> = _sensorData.asStateFlow()
-
-    // Single-value compat property used by legacy observers
-    private val _singleSensorData = MutableStateFlow<Pair<String, String>?>(null)
 
     private val bleDeviceConnector = BleDeviceConnector(
         onConnectionStateChanged = { isConnected ->
             _connectionState.value =
                 if (isConnected) ConnectionState.CONNECTED else ConnectionState.DISCONNECTED
+            if (!isConnected) isConnecting = false
         },
         onReadingsReceived = { readings ->
+            Log.d(TAG, "Readings received: $readings")
             _sensorData.value = readings
-            // Also populate single-value flow for backward compat
-            readings.firstOrNull()?.let { _singleSensorData.value = it }
         },
     )
 
-    /**
-     * Starts a continuous BLE scan. When a known device is detected the scan
-     * stops and a GATT connection is established on the main thread.
-     *
-     * The [BleDeviceConnector] is told the [SensorType] so it can subscribe to
-     * the correct GATT characteristics for that device.
-     */
     fun startScan() {
         _devices.value = emptyList()
+        isConnecting = false
 
         bleScanner.startScan(
             onDeviceFound = { device ->
@@ -73,10 +58,15 @@ class BleManager(
                 }
             },
             onTargetFound = { device ->
+                // Guard: only connect once even if scan fires multiple callbacks
+                if (isConnecting) {
+                    Log.d(TAG, "Already connecting — ignoring duplicate target: ${device.address}")
+                    return@startScan
+                }
+                isConnecting = true
                 val sensorType = KnownDevices.typeFor(device.address)
                 Log.d(TAG, "Sensor detected: $sensorType (${device.address}) — connecting")
-                // connectGatt() MUST be called on the main thread
-                mainHandler.post { connectDevice(device, sensorType) }
+                connectDevice(device, sensorType)
             },
         )
     }
@@ -92,6 +82,7 @@ class BleManager(
     }
 
     fun disconnect() {
+        isConnecting = false
         bleDeviceConnector.disconnect()
     }
 

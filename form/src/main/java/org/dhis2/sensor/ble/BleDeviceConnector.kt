@@ -57,10 +57,7 @@ class BleDeviceConnector(
                 BluetoothProfile.STATE_CONNECTED -> {
                     Log.d(TAG_CONNECT, "Connected to ${gatt.device.address}")
                     onConnectionStateChanged(true)
-                    // Small delay before service discovery helps with some devices
-                    android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
-                        gatt.discoverServices()
-                    }, 300)
+                    gatt.discoverServices()
                 }
                 BluetoothProfile.STATE_DISCONNECTED -> {
                     Log.d(TAG_CONNECT, "Disconnected from ${gatt.device.address} (status=$status)")
