@@ -9,24 +9,29 @@ import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
 
 class BleViewModel(
-    private val bleManager: BleManager
+    private val bleManager: BleManager,
 ) : ViewModel() {
 
     private val _devices = MutableStateFlow<List<BluetoothDevice>>(emptyList())
     val devices = _devices.asStateFlow()
 
-    private val _sensorValue = MutableStateFlow<String>("")
+    /** First reading value (SpO2 or temperature). */
+    private val _sensorValue = MutableStateFlow("")
     val sensorValue = _sensorValue.asStateFlow()
+
+    /** Second reading value (pulse rate for oximeter). Empty for single-value sensors. */
+    private val _secondaryValue = MutableStateFlow("")
+    val secondaryValue = _secondaryValue.asStateFlow()
 
     init {
         bleManager.devices.onEach {
             _devices.value = it
         }.launchIn(viewModelScope)
 
-        bleManager.sensorData.onEach { data ->
-            if (data != null) {
-                _sensorValue.value = data.second
-            }
+        // sensorData is now List<Pair<String,String>> — take first and second entries
+        bleManager.sensorData.onEach { readings ->
+            _sensorValue.value   = readings.getOrNull(0)?.second ?: ""
+            _secondaryValue.value = readings.getOrNull(1)?.second ?: ""
         }.launchIn(viewModelScope)
     }
 
