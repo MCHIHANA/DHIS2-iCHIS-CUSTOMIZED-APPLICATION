@@ -217,21 +217,27 @@ fun SensorButtonWrapper(
     val sensorConfig = viewModel?.sensorConfigRepository?.getConfigByDataElement(fieldUiModel.uid)
     val isSensorRequired = sensorConfig?.sensorRequired ?: false
 
-    val isSensorField = remember(fieldUiModel.label, sensorConfig) {
-        if (sensorConfig != null) {
-            true
-        } else {
-            val label = fieldUiModel.label.lowercase()
-            label.contains("temperature") ||
-                label.contains("weight") ||
-                label.contains("heart rate") ||
-                label.contains("systolic") ||
-                label.contains("diastolic") ||
-                label.contains("blood pressure")
-        }
+    val isSensorField = if (sensorConfig != null) {
+        // DataStore has an explicit entry for this field — always show the button
+        true
+    } else {
+        // Fallback: match by label keywords for fields not yet in DataStore
+        val label = fieldUiModel.label.lowercase()
+        label.contains("temperature") ||
+            label.contains("weight") ||
+            label.contains("heart rate") ||
+            label.contains("heartrate") ||
+            label.contains("systolic") ||
+            label.contains("diastolic") ||
+            label.contains("blood pressure") ||
+            label.contains("spo2") ||
+            label.contains("sp02") ||       // common typo
+            label.contains("oxygen") ||
+            label.contains("pulse") ||
+            label.contains("bpm")
     }
 
-    if (bleAvailable && isSensorField && fieldUiModel.editable && (sensorConfig == null || isSensorRequired)) {
+    if (bleAvailable && isSensorField && fieldUiModel.editable) {
         Column(modifier = Modifier.fillMaxWidth()) {
             // Row layout: [Field Content] [Spacer] [Connect Sensor Button]
             Row(
