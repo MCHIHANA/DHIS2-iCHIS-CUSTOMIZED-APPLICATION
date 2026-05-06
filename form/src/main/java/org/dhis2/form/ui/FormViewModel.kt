@@ -3,6 +3,7 @@ package org.dhis2.form.ui
 import android.os.Handler
 import android.os.Looper
 import android.bluetooth.BluetoothDevice
+import android.util.Log
 import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.ViewModel
@@ -202,23 +203,29 @@ class FormViewModel(
                     else -> return@forEachIndexed
                 }
 
-                // Only reject if a config exists AND the UUID explicitly mismatches
-                val expectedConfig = sensorConfigRepository.getConfigByDataElement(fieldUid)
-                if (expectedConfig != null &&
-                    expectedConfig.serviceUUID != null &&
-                    expectedConfig.serviceUUID.uppercase() != key.uppercase()
-                ) {
-                    Timber.w("UUID mismatch for $fieldUid: expected ${expectedConfig.serviceUUID}, got $key — skipping")
-                    return@forEachIndexed
+                // Skip UUID mismatch check for custom sensor keys (SPO2, PULSE, etc.)
+                // Only check for standard BLE characteristic UUIDs (contain dashes)
+                val isStandardUuid = key.contains("-")
+                if (isStandardUuid) {
+                    val expectedConfig = sensorConfigRepository.getConfigByDataElement(fieldUid)
+                    if (expectedConfig != null &&
+                        expectedConfig.serviceUUID != null &&
+                        expectedConfig.serviceUUID.uppercase() != key.uppercase()
+                    ) {
+                        Timber.w("UUID mismatch for $fieldUid: expected ${expectedConfig.serviceUUID}, got $key — skipping")
+                        return@forEachIndexed
+                    }
                 }
 
-                submitIntent(FormIntent.OnSave(fieldUid, value, ValueType.TEXT))
+                Log.d("SENSOR_SAVE", "Saving $key=$value to field $fieldUid")
+                submitIntent(FormIntent.OnSave(fieldUid, value, ValueType.NUMBER))
                 _sensorStatuses.update { it + (fieldUid to "Data received: $value") }
                 _isFieldScanning.update { it + (fieldUid to false) }
             }
 
-            activeSensorFieldUid = null
-            secondarySensorFieldUid = null
+            // Don't clear activeSensorFieldUid here — keep it so repeated readings
+            // (e.g. continuous oximeter updates) keep going to the right field.
+            // It will be cleared when the dialog is dismissed.
         }.launchIn(viewModelScope)
 
         bleManager.connectionState.onEach { state ->
@@ -1218,6 +1225,19 @@ class FormViewModel(
             m
         }
         bleManager.startScan()
+    }
+
+    /** Called when the sensor dialog is dismissed — stops scan and clears field tracking. */
+    fun stopSensorScan() {
+        bleManager.stopScan()
+        activeSensorFieldUid?.let { uid ->
+            _isFieldScanning.update { it + (uid to false) }
+        }
+        secondarySensorFieldUid?.let { uid ->
+            _isFieldScanning.update { it + (uid to false) }
+        }
+        activeSensorFieldUid = null
+        secondarySensorFieldUid = null
     }
 
     companion object {

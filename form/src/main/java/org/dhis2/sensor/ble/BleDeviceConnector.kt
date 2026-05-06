@@ -1,13 +1,14 @@
 package org.dhis2.sensor.ble
 
 import android.annotation.SuppressLint
-import android.bluetooth.BluetoothDevice
 import android.bluetooth.BluetoothGatt
 import android.bluetooth.BluetoothGattCallback
 import android.bluetooth.BluetoothGattCharacteristic
 import android.bluetooth.BluetoothGattDescriptor
 import android.bluetooth.BluetoothProfile
+import android.bluetooth.BluetoothDevice
 import android.content.Context
+import android.os.Build
 import android.util.Log
 import java.util.UUID
 
@@ -16,32 +17,17 @@ private const val TAG_SERVICE = "BLE_SERVICE"
 private const val TAG_CHAR    = "BLE_CHAR"
 
 // ── Standard BLE SIG UUIDs ────────────────────────────────────────────────────
+private val TEMP_SERVICE_UUID = UUID.fromString("00001809-0000-1000-8000-00805f9b34fb")
+private val TEMP_CHAR_UUID    = UUID.fromString("00002A1C-0000-1000-8000-00805f9b34fb")
+private val CCCD_UUID         = UUID.fromString("00002902-0000-1000-8000-00805f9b34fb")
 
-/** Health Thermometer service (0x1809) */
-private val TEMP_SERVICE_UUID  = UUID.fromString("00001809-0000-1000-8000-00805f9b34fb")
-/** Temperature Measurement characteristic (0x2A1C) — uses INDICATE */
-private val TEMP_CHAR_UUID     = UUID.fromString("00002A1C-0000-1000-8000-00805f9b34fb")
-/** PLX Spot-check Measurement (0x2A5E) — uses INDICATE */
-private val PLX_SPOT_UUID      = UUID.fromString("00002A5E-0000-1000-8000-00805f9b34fb")
-/** PLX Continuous Measurement (0x2A5F) — uses NOTIFY */
-private val PLX_CONT_UUID      = UUID.fromString("00002A5F-0000-1000-8000-00805f9b34fb")
-/** Client Characteristic Configuration Descriptor */
-private val CCCD_UUID          = UUID.fromString("00002902-0000-1000-8000-00805f9b34fb")
-
-// ── FORA O2 custom Nordic service UUIDs ──────────────────────────────────────
-// The FORA O2 uses a Nordic LED Button Service variant to send SpO2 + pulse data.
-
-/** Nordic LED Button Service */
+// ── FORA O2 Nordic service UUIDs ─────────────────────────────────────────────
 private val NORDIC_SERVICE_UUID = UUID.fromString("00001523-1212-efde-1523-785feabcd123")
-/** Nordic Button characteristic — device sends SpO2/pulse readings here via NOTIFY */
 private val NORDIC_BUTTON_UUID  = UUID.fromString("00001524-1212-efde-1523-785feabcd123")
-/** Nordic LED characteristic — used to send commands to the device */
-private val NORDIC_LED_UUID     = UUID.fromString("00001525-1212-efde-1523-785feabcd123")
 
 @SuppressLint("MissingPermission")
 class BleDeviceConnector(
     private val onConnectionStateChanged: (Boolean) -> Unit,
-    /** Called with a list of (key, value) pairs. Keys: "SPO2", "PULSE", UUID strings. */
     private val onReadingsReceived: (List<Pair<String, String>>) -> Unit,
 ) {
 
@@ -51,7 +37,10 @@ class BleDeviceConnector(
     fun connect(context: Context, device: BluetoothDevice, sensorType: SensorType) {
         currentSensorType = sensorType
         Log.d(TAG_CONNECT, "Connecting to ${device.address} (type=$sensorType)...")
-        bluetoothGatt = device.connectGatt(context, false, gattCallback)
+        // autoConnect=true: Android will connect as soon as the device is reachable,
+        // even if it powered off briefly. This avoids GATT_ERROR(133) race conditions
+        // where the device stops advertising before connectGatt() completes.
+        bluetoothGatt = device.connectGatt(context, true, gattCallback)
     }
 
     fun disconnect() {
@@ -68,10 +57,13 @@ class BleDeviceConnector(
                 BluetoothProfile.STATE_CONNECTED -> {
                     Log.d(TAG_CONNECT, "Connected to ${gatt.device.address}")
                     onConnectionStateChanged(true)
-                    gatt.discoverServices()
+                    // Small delay before service discovery helps with some devices
+                    android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
+                        gatt.discoverServices()
+                    }, 300)
                 }
                 BluetoothProfile.STATE_DISCONNECTED -> {
-                    Log.d(TAG_CONNECT, "Disconnected from ${gatt.device.address}")
+                    Log.d(TAG_CONNECT, "Disconnected from ${gatt.device.address} (status=$status)")
                     onConnectionStateChanged(false)
                     gatt.close()
                 }
@@ -86,28 +78,36 @@ class BleDeviceConnector(
                     Log.d(TAG_CHAR, "  Char: ${c.uuid} props=${c.properties}")
                 }
             }
-
             when (currentSensorType) {
-                SensorType.SPO2 -> subscribeForaO2(gatt)
+                SensorType.SPO2        -> subscribeForaO2(gatt)
                 SensorType.TEMPERATURE -> subscribeThermometer(gatt)
-                else -> enableAllNotifiableCharacteristics(gatt)
+                else                   -> enableAllNotifiableCharacteristics(gatt)
             }
         }
 
+        // ── Android 13+ (API 33) new signature ───────────────────────────────
+        override fun onCharacteristicChanged(
+            gatt: BluetoothGatt,
+            characteristic: BluetoothGattCharacteristic,
+            value: ByteArray,
+        ) {
+            val uuid = characteristic.uuid.toString().uppercase()
+            Log.d("BLE_RAW", "[$uuid] ${value.joinToString { "%02X".format(it) }}")
+            dispatchReading(uuid, value)
+        }
+
+        // ── Android 12 and below — deprecated but still needed ───────────────
         @Deprecated("Deprecated in Java")
+        @Suppress("DEPRECATION")
         override fun onCharacteristicChanged(
             gatt: BluetoothGatt,
             characteristic: BluetoothGattCharacteristic,
         ) {
+            // On API 33+ this is never called; on API 32 and below it is.
             val data = characteristic.value ?: return
             val uuid = characteristic.uuid.toString().uppercase()
             Log.d("BLE_RAW", "[$uuid] ${data.joinToString { "%02X".format(it) }}")
-
-            when (currentSensorType) {
-                SensorType.SPO2 -> handleForaO2Data(uuid, data)
-                SensorType.TEMPERATURE -> handleTemperatureData(uuid, data)
-                else -> handleGenericData(uuid, data)
-            }
+            dispatchReading(uuid, data)
         }
 
         override fun onCharacteristicRead(
@@ -117,16 +117,10 @@ class BleDeviceConnector(
         ) {
             if (status == BluetoothGatt.GATT_SUCCESS) {
                 @Suppress("DEPRECATION")
-                onCharacteristicChanged(gatt, characteristic)
+                val data = characteristic.value ?: return
+                val uuid = characteristic.uuid.toString().uppercase()
+                dispatchReading(uuid, data)
             }
-        }
-
-        override fun onCharacteristicWrite(
-            gatt: BluetoothGatt,
-            characteristic: BluetoothGattCharacteristic,
-            status: Int,
-        ) {
-            Log.d(TAG_SERVICE, "Char write: ${characteristic.uuid} status=$status value=${characteristic.value?.joinToString { "%02X".format(it) }}")
         }
 
         override fun onDescriptorWrite(
@@ -135,54 +129,34 @@ class BleDeviceConnector(
             status: Int,
         ) {
             Log.d(TAG_SERVICE, "Descriptor written: ${descriptor.characteristic.uuid} status=$status")
-
-            // After enabling notifications on the FORA O2 button characteristic,
-            // send a trigger command to the LED characteristic to start measurement.
-            // Without this write the device stays silent even with notifications enabled.
-            if (currentSensorType == SensorType.SPO2) {
-                val ledChar = gatt.getService(NORDIC_SERVICE_UUID)
-                    ?.getCharacteristic(NORDIC_LED_UUID)
-                if (ledChar != null) {
-                    // 0x01 = start measurement command (Nordic LED Button Service convention)
-                    ledChar.value = byteArrayOf(0x01)
-                    val written = gatt.writeCharacteristic(ledChar)
-                    Log.d(TAG_SERVICE, "FORA O2 trigger command sent (written=$written)")
-                } else {
-                    Log.w(TAG_SERVICE, "FORA O2 LED characteristic not found — device may not send data")
-                }
-            }
+            // No trigger command needed — FORA O2 sends data automatically
+            // once the finger is placed on the sensor after notifications are enabled.
         }
     }
 
-    // ── FORA O2 (SpO2 + Pulse) ───────────────────────────────────────────────
+    // ── Dispatch to correct parser ────────────────────────────────────────────
 
-    /**
-     * Subscribes to the FORA O2's Nordic custom characteristic.
-     * The device sends SpO2 and pulse rate as NOTIFY on the button characteristic.
-     *
-     * Fallback: if the Nordic service isn't found, enable all notifiable
-     * characteristics so we catch whatever the device sends.
-     */
+    private fun dispatchReading(uuid: String, data: ByteArray) {
+        when (currentSensorType) {
+            SensorType.SPO2        -> handleForaO2Data(uuid, data)
+            SensorType.TEMPERATURE -> handleTemperatureData(uuid, data)
+            else                   -> handleGenericData(uuid, data)
+        }
+    }
+
+    // ── FORA O2 ───────────────────────────────────────────────────────────────
+
     private fun subscribeForaO2(gatt: BluetoothGatt) {
         val service = gatt.getService(NORDIC_SERVICE_UUID)
         if (service == null) {
-            Log.w(TAG_SERVICE, "Nordic service not found on FORA O2 — trying fallback")
-            // Try standard PLX characteristics as secondary fallback
-            val plxSpot = gatt.getService(UUID.fromString("00001822-0000-1000-8000-00805f9b34fb"))
-                ?.getCharacteristic(PLX_SPOT_UUID)
-            if (plxSpot != null) {
-                enableCharacteristic(gatt, plxSpot, indicate = true)
-                Log.d(TAG_SERVICE, "Subscribed to PLX Spot-check characteristic")
-            } else {
-                enableAllNotifiableCharacteristics(gatt)
-            }
+            Log.w(TAG_SERVICE, "Nordic service not found — enabling all notifiable characteristics")
+            enableAllNotifiableCharacteristics(gatt)
             return
         }
-
         val buttonChar = service.getCharacteristic(NORDIC_BUTTON_UUID)
         if (buttonChar != null) {
-            enableCharacteristic(gatt, buttonChar, indicate = false) // NOTIFY
-            Log.d(TAG_SERVICE, "Subscribed to FORA O2 Nordic button characteristic")
+            enableCharacteristic(gatt, buttonChar, indicate = false)
+            Log.d(TAG_SERVICE, "Subscribed to FORA O2 Nordic button characteristic (NOTIFY)")
         } else {
             Log.w(TAG_SERVICE, "Nordic button characteristic not found — enabling all")
             enableAllNotifiableCharacteristics(gatt)
@@ -190,33 +164,54 @@ class BleDeviceConnector(
     }
 
     /**
-     * Parses FORA O2 data packet from the Nordic button characteristic.
+     * Parses FORA O2 data packet.
      *
-     * FORA O2 packet format (observed, 4–6 bytes):
-     *   Byte 0: packet type / status flags
-     *   Byte 1: SpO2 value (0–100 %)
-     *   Byte 2: Pulse rate low byte
-     *   Byte 3: Pulse rate high byte (if > 255 bpm, rare)
+     * The FORA O2 sends packets continuously while a finger is detected.
+     * Observed packet layouts (all little-endian):
      *
-     * Values of 0x7F (127) or 0xFF (255) indicate "no reading yet" — ignored.
+     *   Layout A (4 bytes): [flags, spo2, pulse_lo, pulse_hi]
+     *   Layout B (5 bytes): [flags, spo2, pulse_lo, pulse_hi, perfusion_index]
+     *
+     * SpO2 range: 0–100. Values 0x7F (127) or 0xFF (255) = no finger / initialising.
+     * Pulse range: 0–250 bpm typical. 0 or 0xFF = no reading.
+     *
+     * All raw bytes are logged under BLE_RAW for debugging.
      */
     private fun handleForaO2Data(uuid: String, data: ByteArray) {
-        if (data.size < 3) {
-            Log.d(TAG_SERVICE, "FORA O2 packet too short (${data.size} bytes) — waiting")
+        Log.d(TAG_SERVICE, "FORA O2 raw (${data.size}B): ${data.joinToString { "%02X".format(it) }}")
+
+        if (data.size < 2) {
+            Log.d(TAG_SERVICE, "Packet too short — skipping")
             return
         }
 
-        val spo2 = data[1].toInt() and 0xFF
-        val pulse = (data[2].toInt() and 0xFF) or
-            (if (data.size >= 4) (data[3].toInt() and 0xFF) shl 8 else 0)
+        // Try to find valid SpO2 in bytes 0–2 (different firmware versions use different offsets)
+        var spo2 = -1
+        var pulse = 0
+        var byteOffset = -1
 
-        // 0x7F / 0xFF = sensor still initialising, skip
-        if (spo2 == 0x7F || spo2 == 0xFF || spo2 == 0) {
-            Log.d(TAG_SERVICE, "FORA O2 — sensor initialising (spo2=$spo2), waiting...")
+        for (i in 0 until minOf(data.size - 1, 3)) {
+            val candidate = data[i].toInt() and 0xFF
+            if (candidate in 50..100) {   // valid SpO2 range
+                spo2 = candidate
+                byteOffset = i
+                // Pulse follows SpO2 as little-endian 16-bit
+                pulse = (data.getOrNull(i + 1)?.toInt() ?: 0) and 0xFF
+                if (data.size > i + 2) {
+                    pulse = pulse or (((data[i + 2].toInt() and 0xFF) shl 8))
+                }
+                // Sanity check pulse
+                if (pulse !in 20..300) pulse = pulse and 0xFF  // take just low byte
+                break
+            }
+        }
+
+        if (spo2 == -1) {
+            Log.d(TAG_SERVICE, "No valid SpO2 in packet (no finger or initialising)")
             return
         }
 
-        Log.d("BLE_SPO2", "SpO2=$spo2% Pulse=$pulse bpm")
+        Log.d("BLE_SPO2", "SpO2=$spo2% Pulse=$pulse bpm (offset=$byteOffset)")
 
         onReadingsReceived(
             listOf(
@@ -226,7 +221,7 @@ class BleDeviceConnector(
         )
     }
 
-    // ── Thermometer ──────────────────────────────────────────────────────────
+    // ── Thermometer ───────────────────────────────────────────────────────────
 
     private fun subscribeThermometer(gatt: BluetoothGatt) {
         val service = gatt.getService(TEMP_SERVICE_UUID)
@@ -237,8 +232,8 @@ class BleDeviceConnector(
         }
         val char = service.getCharacteristic(TEMP_CHAR_UUID)
         if (char != null) {
-            enableCharacteristic(gatt, char, indicate = true) // 0x2A1C uses INDICATE
-            Log.d(TAG_SERVICE, "Subscribed to Temperature Measurement characteristic")
+            enableCharacteristic(gatt, char, indicate = true)
+            Log.d(TAG_SERVICE, "Subscribed to Temperature Measurement (INDICATE)")
         } else {
             Log.w(TAG_SERVICE, "Temperature characteristic not found — enabling all")
             enableAllNotifiableCharacteristics(gatt)
@@ -252,7 +247,7 @@ class BleDeviceConnector(
         onReadingsReceived(listOf(Pair(uuid, "%.1f".format(value))))
     }
 
-    // ── Generic fallback ─────────────────────────────────────────────────────
+    // ── Generic fallback ──────────────────────────────────────────────────────
 
     private fun handleGenericData(uuid: String, data: ByteArray) {
         val parsedValue = when {
@@ -273,7 +268,7 @@ class BleDeviceConnector(
         onReadingsReceived(listOf(Pair(uuid, parsedValue)))
     }
 
-    // ── Helpers ──────────────────────────────────────────────────────────────
+    // ── Helpers ───────────────────────────────────────────────────────────────
 
     private fun enableCharacteristic(
         gatt: BluetoothGatt,
@@ -283,9 +278,22 @@ class BleDeviceConnector(
         gatt.setCharacteristicNotification(characteristic, true)
         val descriptor = characteristic.getDescriptor(CCCD_UUID)
         if (descriptor != null) {
-            descriptor.value = if (indicate) byteArrayOf(0x02, 0x00)
-                               else BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE
-            gatt.writeDescriptor(descriptor)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                // API 33+ — use new writeDescriptor API
+                gatt.writeDescriptor(
+                    descriptor,
+                    if (indicate) byteArrayOf(0x02, 0x00)
+                    else BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE,
+                )
+            } else {
+                @Suppress("DEPRECATION")
+                descriptor.value = if (indicate) byteArrayOf(0x02, 0x00)
+                                   else BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE
+                @Suppress("DEPRECATION")
+                gatt.writeDescriptor(descriptor)
+            }
+        } else {
+            Log.w(TAG_SERVICE, "No CCCD on ${characteristic.uuid} — notifications may not work")
         }
     }
 
@@ -296,7 +304,7 @@ class BleDeviceConnector(
                 val canNotify   = (props and BluetoothGattCharacteristic.PROPERTY_NOTIFY)   != 0
                 val canIndicate = (props and BluetoothGattCharacteristic.PROPERTY_INDICATE) != 0
                 if (canNotify || canIndicate) {
-                    enableCharacteristic(gatt, characteristic, indicate = canIndicate)
+                    enableCharacteristic(gatt, characteristic, indicate = canIndicate && !canNotify)
                 }
             }
         }

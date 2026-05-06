@@ -174,7 +174,7 @@ fun SensorConnectionScreen(
         ),
         onDismiss = {
             coroutineScope.launch {
-                viewModel.bleManager.stopScan()
+                viewModel.stopSensorScan()
                 delay(100)
                 onDismiss()
             }
@@ -210,7 +210,7 @@ fun SensorConnectionScreen(
                 text = "CANCEL",
                 onClick = {
                     coroutineScope.launch {
-                        viewModel.bleManager.stopScan()
+                        viewModel.stopSensorScan()
                         delay(100)
                         onDismiss()
                     }

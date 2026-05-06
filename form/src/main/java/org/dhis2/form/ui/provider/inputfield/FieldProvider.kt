@@ -139,52 +139,53 @@ fun FieldProvider(
         }
     }
 
-    when {
-        fieldUiModel.optionSet != null && fieldUiModel.valueType != ValueType.MULTI_TEXT ->
-            ProvideByOptionSet(
-                modifier = modifierWithFocus,
-                inputStyle = inputStyle,
-                fieldUiModel = fieldUiModel,
-                intentHandler = intentHandler,
-                fetchOptions = {
-                    intentHandler(
-                        FormIntent.FetchOptions(
-                            fieldUiModel.uid,
-                            fieldUiModel.optionSet!!,
-                            value = fieldUiModel.value,
-                        ),
-                    )
-                },
-            )
+    // Wrap everything in SensorButtonWrapper so the Connect Sensor button
+    // appears on any field that has a sensor config, regardless of field type.
+    SensorButtonWrapper(
+        fieldUiModel = fieldUiModel,
+        intentHandler = intentHandler,
+        sensorStatus = sensorStatus,
+        isScanning = isScanning,
+        onConnectToSensor = onConnectToSensor,
+        viewModel = viewModel,
+    ) {
+        when {
+            fieldUiModel.optionSet != null && fieldUiModel.valueType != ValueType.MULTI_TEXT ->
+                ProvideByOptionSet(
+                    modifier = modifierWithFocus,
+                    inputStyle = inputStyle,
+                    fieldUiModel = fieldUiModel,
+                    intentHandler = intentHandler,
+                    fetchOptions = {
+                        intentHandler(
+                            FormIntent.FetchOptions(
+                                fieldUiModel.uid,
+                                fieldUiModel.optionSet!!,
+                                value = fieldUiModel.value,
+                            ),
+                        )
+                    },
+                )
 
-        fieldUiModel.customIntent != null -> {
-            ProvideCustomIntentInput(
-                fieldUiModel = fieldUiModel,
-                intentHandler = intentHandler,
-                uiEventHandler = uiEventHandler,
-                resources = resources,
-                inputStyle = inputStyle,
-                reEvaluateRequestParams = reEvaluateCustomIntentRequestParameters,
-                modifier = modifierWithFocus,
-            )
-        }
+            fieldUiModel.customIntent != null ->
+                ProvideCustomIntentInput(
+                    fieldUiModel = fieldUiModel,
+                    intentHandler = intentHandler,
+                    uiEventHandler = uiEventHandler,
+                    resources = resources,
+                    inputStyle = inputStyle,
+                    reEvaluateRequestParams = reEvaluateCustomIntentRequestParameters,
+                    modifier = modifierWithFocus,
+                )
 
-        fieldUiModel.eventCategories != null ->
-            ProvideCategorySelectorInput(
-                modifier = modifierWithFocus,
-                inputStyle = inputStyle,
-                fieldUiModel = fieldUiModel,
-            )
+            fieldUiModel.eventCategories != null ->
+                ProvideCategorySelectorInput(
+                    modifier = modifierWithFocus,
+                    inputStyle = inputStyle,
+                    fieldUiModel = fieldUiModel,
+                )
 
-        else ->
-            SensorButtonWrapper(
-                fieldUiModel = fieldUiModel,
-                intentHandler = intentHandler,
-                sensorStatus = sensorStatus,
-                isScanning = isScanning,
-                onConnectToSensor = onConnectToSensor,
-                viewModel = viewModel
-            ) {
+            else ->
                 ProvideByValueType(
                     modifier = modifierWithFocus,
                     inputStyle = inputStyle,
@@ -197,7 +198,7 @@ fun FieldProvider(
                     focusManager = focusManager,
                     onFileSelected = onFileSelected,
                 )
-            }
+        }
     }
 }
 
@@ -233,6 +234,7 @@ fun SensorButtonWrapper(
             label.contains("spo2") ||
             label.contains("sp02") ||       // common typo
             label.contains("oxygen") ||
+            label.contains("saturation") ||
             label.contains("pulse") ||
             label.contains("bpm")
     }
