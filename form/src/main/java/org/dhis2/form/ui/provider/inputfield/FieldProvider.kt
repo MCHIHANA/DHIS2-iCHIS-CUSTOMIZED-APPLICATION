@@ -214,29 +214,40 @@ fun SensorButtonWrapper(
 ) {
     val context = LocalContext.current
     val bleAvailable = remember { SensorAvailabilityManager.isBleSupported(context) }
-    
-    val sensorConfig = viewModel?.sensorConfigRepository?.getConfigByDataElement(fieldUiModel.uid)
-    val isSensorRequired = sensorConfig?.sensorRequired ?: false
 
-    val isSensorField = if (sensorConfig != null) {
-        // DataStore has an explicit entry for this field — always show the button
-        true
-    } else {
-        // Fallback: match by label keywords for fields not yet in DataStore
-        val label = fieldUiModel.label.lowercase()
-        label.contains("temperature") ||
-            label.contains("weight") ||
-            label.contains("heart rate") ||
-            label.contains("heartrate") ||
-            label.contains("systolic") ||
-            label.contains("diastolic") ||
-            label.contains("blood pressure") ||
-            label.contains("spo2") ||
-            label.contains("sp02") ||       // common typo
-            label.contains("oxygen") ||
-            label.contains("saturation") ||
-            label.contains("pulse") ||
-            label.contains("bpm")
+    val sensorConfig = viewModel?.sensorConfigRepository?.getConfigByDataElement(fieldUiModel.uid)
+
+    // Known sensor field UIDs — hardcoded as a guaranteed fallback when DataStore
+    // hasn't loaded yet or viewModel is null (e.g. search screen).
+    val knownSensorUids = setOf(
+        "KXNH45ts16S", // Temperature
+        "VqwQWWDmYLn", // SpO2
+        "tZbUrUbhUNy", // Pulse Rate
+        "S7OjKl85YSh", // Heart Rate
+        "HkfzcXMdLLF", // Systolic BP
+        "skBarAsIYIL", // Diastolic BP
+    )
+
+    val isSensorField = when {
+        sensorConfig != null -> true                          // DataStore match
+        fieldUiModel.uid in knownSensorUids -> true           // hardcoded UID match
+        else -> {
+            // Label keyword fallback
+            val label = fieldUiModel.label.lowercase()
+            label.contains("temperature") ||
+                label.contains("weight") ||
+                label.contains("heart rate") ||
+                label.contains("heartrate") ||
+                label.contains("systolic") ||
+                label.contains("diastolic") ||
+                label.contains("blood pressure") ||
+                label.contains("spo2") ||
+                label.contains("sp02") ||
+                label.contains("oxygen") ||
+                label.contains("saturation") ||
+                label.contains("pulse") ||
+                label.contains("bpm")
+        }
     }
 
     if (bleAvailable && isSensorField && fieldUiModel.editable) {
@@ -277,8 +288,10 @@ fun SensorButtonWrapper(
                     text = sensorStatus ?: "Searching...",
                     style = MaterialTheme.typography.bodySmall,
                     color = when {
-                        sensorStatus?.contains("connected", true) == true -> Color(0xFF4CAF50)
-                        sensorStatus?.contains("No connections available", true) == true -> Color(0xFFF44336)
+                        sensorStatus?.startsWith("Data received", ignoreCase = true) == true -> Color(0xFF4CAF50)
+                        sensorStatus?.contains("connected", ignoreCase = true) == true -> Color(0xFF4CAF50)
+                        sensorStatus?.contains("No connections", ignoreCase = true) == true -> Color(0xFFF44336)
+                        sensorStatus?.contains("denied", ignoreCase = true) == true -> Color(0xFFF44336)
                         else -> MaterialTheme.colorScheme.secondary
                     },
                     modifier = Modifier.padding(horizontal = Spacing.Spacing16, vertical = Spacing.Spacing4)
