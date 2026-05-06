@@ -73,6 +73,8 @@ private val BLE_PERMISSIONS = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
 class SensorConnectionBottomSheet(
     private val fieldUid: String,
     private val viewModel: FormViewModel,
+    /** For multi-value sensors (oximeter): UID of the second field to fill. */
+    private val secondaryFieldUid: String? = null,
 ) : DialogFragment() {
 
     override fun onCreateDialog(savedInstanceState: Bundle?): android.app.Dialog {
@@ -93,6 +95,7 @@ class SensorConnectionBottomSheet(
             DHIS2Theme {
                 SensorConnectionScreen(
                     fieldUid = fieldUid,
+                    secondaryFieldUid = secondaryFieldUid,
                     viewModel = viewModel,
                     onDismiss = {
                         Log.d("SensorBottomSheet", "Closing dialog")
@@ -111,6 +114,7 @@ class SensorConnectionBottomSheet(
 @Composable
 fun SensorConnectionScreen(
     fieldUid: String,
+    secondaryFieldUid: String? = null,
     viewModel: FormViewModel,
     onDismiss: () -> Unit,
 ) {
@@ -129,7 +133,7 @@ fun SensorConnectionScreen(
     ) { results ->
         if (results.values.all { it }) {
             Log.d("SensorBottomSheet", "BLE permissions granted — starting scan")
-            viewModel.startSensorScan(fieldUid)
+            viewModel.startSensorScan(fieldUid, secondaryFieldUid)
         } else {
             Log.w("SensorBottomSheet", "BLE permissions denied")
             permissionDenied = true
@@ -143,16 +147,21 @@ fun SensorConnectionScreen(
             ContextCompat.checkSelfPermission(context, it) == PackageManager.PERMISSION_GRANTED
         }
         if (allGranted) {
-            viewModel.startSensorScan(fieldUid)
+            viewModel.startSensorScan(fieldUid, secondaryFieldUid)
         } else {
             permissionLauncher.launch(BLE_PERMISSIONS)
         }
     }
 
-    // Auto-dismiss once data is received
-    LaunchedEffect(status) {
-        if (status.startsWith("Data received")) {
-            Log.d("SensorBottomSheet", "Data received — dismissing: $status")
+    // Auto-dismiss once data is received on either field
+    val secondaryStatuses by viewModel.sensorStatuses.collectAsState()
+    val secondaryStatus = if (secondaryFieldUid != null) secondaryStatuses[secondaryFieldUid] ?: "" else ""
+
+    LaunchedEffect(status, secondaryStatus) {
+        if (status.startsWith("Data received") ||
+            (secondaryFieldUid != null && secondaryStatus.startsWith("Data received"))
+        ) {
+            Log.d("SensorBottomSheet", "Data received — dismissing")
             delay(1200)
             onDismiss()
         }

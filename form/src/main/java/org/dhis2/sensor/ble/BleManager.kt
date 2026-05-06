@@ -27,36 +27,39 @@ class BleManager(
     val connectionState: StateFlow<ConnectionState> = _connectionState.asStateFlow()
 
     /**
-     * Emits sensor readings as (characteristicUUID, parsedValue) pairs.
-     * Observed by FormViewModel to auto-fill the focused form field.
+     * Emits one or more sensor readings as a list of (characteristicUUID, parsedValue) pairs.
+     *
+     * Single-value sensors (thermometer) emit a list with one entry.
+     * Multi-value sensors (oximeter) emit a list with two entries:
+     *   - ("SPO2",  "98")   — SpO2 percentage
+     *   - ("PULSE", "72")   — Pulse rate in bpm
+     *
+     * FormViewModel observes this and routes each reading to the correct field.
      */
-    private val _sensorData = MutableStateFlow<Pair<String, String>?>(null)
-    val sensorData: StateFlow<Pair<String, String>?> = _sensorData.asStateFlow()
+    private val _sensorData = MutableStateFlow<List<Pair<String, String>>>(emptyList())
+    val sensorData: StateFlow<List<Pair<String, String>>> = _sensorData.asStateFlow()
+
+    // Single-value compat property used by legacy observers
+    private val _singleSensorData = MutableStateFlow<Pair<String, String>?>(null)
 
     private val bleDeviceConnector = BleDeviceConnector(
         onConnectionStateChanged = { isConnected ->
             _connectionState.value =
                 if (isConnected) ConnectionState.CONNECTED else ConnectionState.DISCONNECTED
         },
-        onDataReceived = { uuid, value ->
-            _sensorData.value = Pair(uuid, value)
+        onReadingsReceived = { readings ->
+            _sensorData.value = readings
+            // Also populate single-value flow for backward compat
+            readings.firstOrNull()?.let { _singleSensorData.value = it }
         },
     )
 
     /**
-     * Starts a continuous BLE scan filtered to the Health Thermometer service
-     * (UUID 0x1809). When a matching device is detected the scan stops and a
-     * GATT connection is established on the **main thread** to receive the
-     * temperature measurement.
+     * Starts a continuous BLE scan. When a known device is detected the scan
+     * stops and a GATT connection is established on the main thread.
      *
-     * Flow:
-     *   1. User taps Temperature field → [startScan] is called
-     *   2. User turns ON the thermometer
-     *   3. Thermometer advertises service UUID 0x1809
-     *   4. Scanner detects it → stops scan → connects via GATT (main thread)
-     *   5. GATT discovers services → subscribes to 0x2A1C (INDICATE)
-     *   6. Thermometer sends measurement → [_sensorData] is updated
-     *   7. FormViewModel observer saves the value to the form field
+     * The [BleDeviceConnector] is told the [SensorType] so it can subscribe to
+     * the correct GATT characteristics for that device.
      */
     fun startScan() {
         _devices.value = emptyList()
@@ -70,9 +73,10 @@ class BleManager(
                 }
             },
             onTargetFound = { device ->
-                Log.d(TAG, "Health Thermometer detected — connecting to ${device.address}")
-                // connectGatt() MUST be called on the main thread to avoid crashes
-                mainHandler.post { connectDevice(device) }
+                val sensorType = KnownDevices.typeFor(device.address)
+                Log.d(TAG, "Sensor detected: $sensorType (${device.address}) — connecting")
+                // connectGatt() MUST be called on the main thread
+                mainHandler.post { connectDevice(device, sensorType) }
             },
         )
     }
@@ -81,10 +85,10 @@ class BleManager(
         bleScanner.stopScan()
     }
 
-    fun connectDevice(device: BluetoothDevice) {
+    fun connectDevice(device: BluetoothDevice, sensorType: SensorType = SensorType.UNKNOWN) {
         stopScan()
         _connectionState.value = ConnectionState.CONNECTING
-        bleDeviceConnector.connect(context, device)
+        bleDeviceConnector.connect(context, device, sensorType)
     }
 
     fun disconnect() {

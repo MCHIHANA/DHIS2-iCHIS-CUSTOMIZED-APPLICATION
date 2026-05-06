@@ -228,7 +228,39 @@ class FormView : Fragment() {
                     sensorStatuses = sensorStatuses,
                     isFieldScanning = isFieldScanning,
                     onConnectToSensor = { uid ->
-                        SensorConnectionBottomSheet(uid, viewModel).show(childFragmentManager)
+                        // For multi-value sensors (oximeter), find the paired field.
+                        // The SpO2 field is the primary; pulse rate is secondary.
+                        // We detect the pairing by label keywords on the current items list.
+                        val currentItems = viewModel.items.value ?: emptyList()
+                        val tappedField = currentItems.firstOrNull { it.uid == uid }
+                        val secondaryUid = when {
+                            tappedField?.label?.contains("spo2", ignoreCase = true) == true ||
+                            tappedField?.label?.contains("oxygen", ignoreCase = true) == true ||
+                            tappedField?.label?.contains("SpO2", ignoreCase = true) == true -> {
+                                // Primary = SpO2, secondary = pulse/heart rate field
+                                currentItems.firstOrNull { item ->
+                                    item.uid != uid && (
+                                        item.label.contains("pulse", ignoreCase = true) ||
+                                        item.label.contains("heart rate", ignoreCase = true) ||
+                                        item.label.contains("bpm", ignoreCase = true)
+                                    )
+                                }?.uid
+                            }
+                            tappedField?.label?.contains("pulse", ignoreCase = true) == true ||
+                            tappedField?.label?.contains("heart rate", ignoreCase = true) == true ||
+                            tappedField?.label?.contains("bpm", ignoreCase = true) == true -> {
+                                // Primary = pulse, secondary = SpO2 field
+                                currentItems.firstOrNull { item ->
+                                    item.uid != uid && (
+                                        item.label.contains("spo2", ignoreCase = true) ||
+                                        item.label.contains("oxygen", ignoreCase = true)
+                                    )
+                                }?.uid
+                            }
+                            else -> null
+                        }
+                        SensorConnectionBottomSheet(uid, viewModel, secondaryUid)
+                            .show(childFragmentManager)
                     }
                 )
 

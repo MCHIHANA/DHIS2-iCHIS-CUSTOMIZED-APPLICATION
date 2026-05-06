@@ -181,34 +181,50 @@ class FormViewModel(
     /** UID of the field currently waiting for a sensor reading. Set when scan starts. */
     private var activeSensorFieldUid: String? = null
 
-    private fun observeSensorData() {
-        bleManager.sensorData.onEach { data ->
-            data?.let { (uuid, value) ->
-                // Use the field UID captured at scan-start time.
-                // Fall back to the currently focused item if no scan is active.
-                val fieldUid = activeSensorFieldUid
-                    ?: repository.currentFocusedItem()?.uid
-                    ?: return@let
+    /**
+     * UID of the secondary field for multi-value sensors (e.g. pulse rate when
+     * the primary field is SpO2). Set via [startSensorScan].
+     */
+    private var secondarySensorFieldUid: String? = null
 
-                // Only reject if a config exists AND the UUID explicitly mismatches.
+    private fun observeSensorData() {
+        bleManager.sensorData.onEach { readings ->
+            if (readings.isEmpty()) return@onEach
+
+            val primaryUid = activeSensorFieldUid
+                ?: repository.currentFocusedItem()?.uid
+                ?: return@onEach
+
+            readings.forEachIndexed { index, (key, value) ->
+                val fieldUid = when (index) {
+                    0 -> primaryUid
+                    1 -> secondarySensorFieldUid ?: return@forEachIndexed
+                    else -> return@forEachIndexed
+                }
+
+                // Only reject if a config exists AND the UUID explicitly mismatches
                 val expectedConfig = sensorConfigRepository.getConfigByDataElement(fieldUid)
                 if (expectedConfig != null &&
                     expectedConfig.serviceUUID != null &&
-                    expectedConfig.serviceUUID.uppercase() != uuid.uppercase()
+                    expectedConfig.serviceUUID.uppercase() != key.uppercase()
                 ) {
-                    Timber.w("UUID mismatch: expected ${expectedConfig.serviceUUID}, got $uuid — skipping")
-                    return@let
+                    Timber.w("UUID mismatch for $fieldUid: expected ${expectedConfig.serviceUUID}, got $key — skipping")
+                    return@forEachIndexed
                 }
 
                 submitIntent(FormIntent.OnSave(fieldUid, value, ValueType.TEXT))
                 _sensorStatuses.update { it + (fieldUid to "Data received: $value") }
                 _isFieldScanning.update { it + (fieldUid to false) }
-                activeSensorFieldUid = null // clear after successful read
             }
+
+            activeSensorFieldUid = null
+            secondarySensorFieldUid = null
         }.launchIn(viewModelScope)
 
         bleManager.connectionState.onEach { state ->
-             val fieldUid = repository.currentFocusedItem()?.uid ?: return@onEach
+             val fieldUid = activeSensorFieldUid
+                 ?: repository.currentFocusedItem()?.uid
+                 ?: return@onEach
              val status = when(state) {
                  org.dhis2.sensor.ble.BleManager.ConnectionState.CONNECTED -> "Connected"
                  org.dhis2.sensor.ble.BleManager.ConnectionState.CONNECTING -> "Connecting..."
@@ -216,6 +232,10 @@ class FormViewModel(
                  org.dhis2.sensor.ble.BleManager.ConnectionState.DISCONNECTING -> "Disconnecting..."
              }
              _sensorStatuses.update { it + (fieldUid to status) }
+             // Also update secondary field status for multi-value sensors
+             secondarySensorFieldUid?.let { secUid ->
+                 _sensorStatuses.update { it + (secUid to status) }
+             }
         }.launchIn(viewModelScope)
     }
 
@@ -1178,11 +1198,25 @@ class FormViewModel(
      * Starts a BLE scan for the given field directly — bypasses the intent
      * pipeline to avoid deduplication and emission-before-collection race conditions.
      * Called from the bottom sheet's LaunchedEffect(Unit).
+     *
+     * @param primaryFieldUid   UID of the field to fill with the first reading
+     *                          (SpO2 for oximeter, temperature for thermometer).
+     * @param secondaryFieldUid UID of the field to fill with the second reading
+     *                          (pulse rate for oximeter). Null for single-value sensors.
      */
-    fun startSensorScan(fieldUid: String) {
-        activeSensorFieldUid = fieldUid
-        _isFieldScanning.update { it + (fieldUid to true) }
-        _sensorStatuses.update { it + (fieldUid to "Waiting for sensor...") }
+    fun startSensorScan(primaryFieldUid: String, secondaryFieldUid: String? = null) {
+        activeSensorFieldUid = primaryFieldUid
+        secondarySensorFieldUid = secondaryFieldUid
+        _isFieldScanning.update { map ->
+            var m = map + (primaryFieldUid to true)
+            if (secondaryFieldUid != null) m = m + (secondaryFieldUid to true)
+            m
+        }
+        _sensorStatuses.update { map ->
+            var m = map + (primaryFieldUid to "Waiting for sensor...")
+            if (secondaryFieldUid != null) m = m + (secondaryFieldUid to "Waiting for sensor...")
+            m
+        }
         bleManager.startScan()
     }
 
