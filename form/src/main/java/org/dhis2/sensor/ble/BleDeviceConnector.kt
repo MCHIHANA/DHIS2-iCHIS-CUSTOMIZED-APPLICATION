@@ -121,12 +121,36 @@ class BleDeviceConnector(
             }
         }
 
+        override fun onCharacteristicWrite(
+            gatt: BluetoothGatt,
+            characteristic: BluetoothGattCharacteristic,
+            status: Int,
+        ) {
+            Log.d(TAG_SERVICE, "Char write: ${characteristic.uuid} status=$status value=${characteristic.value?.joinToString { "%02X".format(it) }}")
+        }
+
         override fun onDescriptorWrite(
             gatt: BluetoothGatt,
             descriptor: BluetoothGattDescriptor,
             status: Int,
         ) {
             Log.d(TAG_SERVICE, "Descriptor written: ${descriptor.characteristic.uuid} status=$status")
+
+            // After enabling notifications on the FORA O2 button characteristic,
+            // send a trigger command to the LED characteristic to start measurement.
+            // Without this write the device stays silent even with notifications enabled.
+            if (currentSensorType == SensorType.SPO2) {
+                val ledChar = gatt.getService(NORDIC_SERVICE_UUID)
+                    ?.getCharacteristic(NORDIC_LED_UUID)
+                if (ledChar != null) {
+                    // 0x01 = start measurement command (Nordic LED Button Service convention)
+                    ledChar.value = byteArrayOf(0x01)
+                    val written = gatt.writeCharacteristic(ledChar)
+                    Log.d(TAG_SERVICE, "FORA O2 trigger command sent (written=$written)")
+                } else {
+                    Log.w(TAG_SERVICE, "FORA O2 LED characteristic not found — device may not send data")
+                }
+            }
         }
     }
 
