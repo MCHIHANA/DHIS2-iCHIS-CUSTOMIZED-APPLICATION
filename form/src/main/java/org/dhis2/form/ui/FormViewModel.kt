@@ -3,6 +3,7 @@ package org.dhis2.form.ui
 import android.os.Handler
 import android.os.Looper
 import android.bluetooth.BluetoothDevice
+import android.util.Log
 import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.ViewModel
@@ -181,41 +182,73 @@ class FormViewModel(
     /** UID of the field currently waiting for a sensor reading. Set when scan starts. */
     private var activeSensorFieldUid: String? = null
 
-    private fun observeSensorData() {
-        bleManager.sensorData.onEach { data ->
-            data?.let { (uuid, value) ->
-                // Use the field UID captured at scan-start time.
-                // Fall back to the currently focused item if no scan is active.
-                val fieldUid = activeSensorFieldUid
-                    ?: repository.currentFocusedItem()?.uid
-                    ?: return@let
+    /**
+     * UID of the secondary field for multi-value sensors (e.g. pulse rate when
+     * the primary field is SpO2). Set via [startSensorScan].
+     */
+    private var secondarySensorFieldUid: String? = null
 
-                // Only reject if a config exists AND the UUID explicitly mismatches.
-                val expectedConfig = sensorConfigRepository.getConfigByDataElement(fieldUid)
-                if (expectedConfig != null &&
-                    expectedConfig.serviceUUID != null &&
-                    expectedConfig.serviceUUID.uppercase() != uuid.uppercase()
-                ) {
-                    Timber.w("UUID mismatch: expected ${expectedConfig.serviceUUID}, got $uuid — skipping")
-                    return@let
+    private fun observeSensorData() {
+        bleManager.sensorData.onEach { readings ->
+            if (readings.isEmpty()) return@onEach
+
+            val primaryUid = activeSensorFieldUid
+                ?: repository.currentFocusedItem()?.uid
+                ?: return@onEach
+
+            Log.d("SENSOR_DATA", "Received ${readings.size} readings for primary field: $primaryUid, secondary: $secondarySensorFieldUid")
+
+            readings.forEachIndexed { index, (key, value) ->
+                val fieldUid = when (index) {
+                    0 -> primaryUid
+                    1 -> secondarySensorFieldUid ?: return@forEachIndexed
+                    else -> return@forEachIndexed
                 }
 
-                submitIntent(FormIntent.OnSave(fieldUid, value, ValueType.TEXT))
+                Log.d("SENSOR_DATA", "Processing reading $index: key=$key, value=$value, targetField=$fieldUid")
+
+                // Skip UUID validation for custom sensor keys (SPO2, PULSE, etc.)
+                // These are semantic keys from multi-value sensors, not BLE characteristic UUIDs.
+                // Only validate standard BLE UUIDs (format: xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx)
+                val isStandardUuid = key.matches(Regex("^[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12}$"))
+                if (isStandardUuid) {
+                    val expectedConfig = sensorConfigRepository.getConfigByDataElement(fieldUid)
+                    if (expectedConfig != null &&
+                        expectedConfig.serviceUUID != null &&
+                        !expectedConfig.serviceUUID.equals(key, ignoreCase = true)
+                    ) {
+                        Log.w("SENSOR_DATA", "UUID mismatch for $fieldUid: expected ${expectedConfig.serviceUUID}, got $key — skipping")
+                        return@forEachIndexed
+                    }
+                }
+
+                Log.d("SENSOR_SAVE", "Saving $key=$value to field $fieldUid")
+                submitIntent(FormIntent.OnSave(fieldUid, value, ValueType.NUMBER))
                 _sensorStatuses.update { it + (fieldUid to "Data received: $value") }
                 _isFieldScanning.update { it + (fieldUid to false) }
-                activeSensorFieldUid = null // clear after successful read
             }
+
+            // Don't clear activeSensorFieldUid here — keep it so repeated readings
+            // (e.g. continuous oximeter updates) keep going to the right field.
+            // It will be cleared when the dialog is dismissed.
         }.launchIn(viewModelScope)
 
         bleManager.connectionState.onEach { state ->
-             val fieldUid = repository.currentFocusedItem()?.uid ?: return@onEach
+             val fieldUid = activeSensorFieldUid
+                 ?: repository.currentFocusedItem()?.uid
+                 ?: return@onEach
              val status = when(state) {
-                 org.dhis2.sensor.ble.BleManager.ConnectionState.CONNECTED -> "Connected"
-                 org.dhis2.sensor.ble.BleManager.ConnectionState.CONNECTING -> "Connecting..."
+                 org.dhis2.sensor.ble.BleManager.ConnectionState.CONNECTED -> "Connected - Place finger on sensor now!"
+                 org.dhis2.sensor.ble.BleManager.ConnectionState.CONNECTING -> "Connecting to sensor..."
                  org.dhis2.sensor.ble.BleManager.ConnectionState.DISCONNECTED -> "Disconnected"
                  org.dhis2.sensor.ble.BleManager.ConnectionState.DISCONNECTING -> "Disconnecting..."
              }
+             Log.d(TAG, "Connection state changed: $status")
              _sensorStatuses.update { it + (fieldUid to status) }
+             // Also update secondary field status for multi-value sensors
+             secondarySensorFieldUid?.let { secUid ->
+                 _sensorStatuses.update { it + (secUid to status) }
+             }
         }.launchIn(viewModelScope)
     }
 
@@ -1178,12 +1211,51 @@ class FormViewModel(
      * Starts a BLE scan for the given field directly — bypasses the intent
      * pipeline to avoid deduplication and emission-before-collection race conditions.
      * Called from the bottom sheet's LaunchedEffect(Unit).
+     *
+     * @param primaryFieldUid   UID of the field to fill with the first reading
+     *                          (SpO2 for oximeter, temperature for thermometer).
+     * @param secondaryFieldUid UID of the field to fill with the second reading
+     *                          (pulse rate for oximeter). Null for single-value sensors.
      */
-    fun startSensorScan(fieldUid: String) {
-        activeSensorFieldUid = fieldUid
-        _isFieldScanning.update { it + (fieldUid to true) }
-        _sensorStatuses.update { it + (fieldUid to "Waiting for sensor...") }
-        bleManager.startScan()
+    fun startSensorScan(primaryFieldUid: String, secondaryFieldUid: String? = null) {
+        Log.d(TAG, "startSensorScan called: primary=$primaryFieldUid, secondary=$secondaryFieldUid")
+        activeSensorFieldUid = primaryFieldUid
+        secondarySensorFieldUid = secondaryFieldUid
+        _isFieldScanning.update { map ->
+            var m = map + (primaryFieldUid to true)
+            if (secondaryFieldUid != null) m = m + (secondaryFieldUid to true)
+            m
+        }
+        _sensorStatuses.update { map ->
+            var m = map + (primaryFieldUid to "Scanning for sensor...")
+            if (secondaryFieldUid != null) m = m + (secondaryFieldUid to "Scanning for sensor...")
+            m
+        }
+        Log.d(TAG, "Starting BLE scan via bleManager")
+        try {
+            bleManager.startScan()
+            Log.d(TAG, "BLE scan started successfully")
+        } catch (e: Exception) {
+            Log.e(TAG, "Error starting BLE scan", e)
+            _sensorStatuses.update { map ->
+                var m = map + (primaryFieldUid to "Error: ${e.message}")
+                if (secondaryFieldUid != null) m = m + (secondaryFieldUid to "Error: ${e.message}")
+                m
+            }
+        }
+    }
+
+    /** Called when the sensor dialog is dismissed — stops scan and clears field tracking. */
+    fun stopSensorScan() {
+        bleManager.stopScan()
+        activeSensorFieldUid?.let { uid ->
+            _isFieldScanning.update { it + (uid to false) }
+        }
+        secondarySensorFieldUid?.let { uid ->
+            _isFieldScanning.update { it + (uid to false) }
+        }
+        activeSensorFieldUid = null
+        secondarySensorFieldUid = null
     }
 
     companion object {

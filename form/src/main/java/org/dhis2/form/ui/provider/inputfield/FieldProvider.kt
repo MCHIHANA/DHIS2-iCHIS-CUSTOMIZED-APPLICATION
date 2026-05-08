@@ -139,52 +139,53 @@ fun FieldProvider(
         }
     }
 
-    when {
-        fieldUiModel.optionSet != null && fieldUiModel.valueType != ValueType.MULTI_TEXT ->
-            ProvideByOptionSet(
-                modifier = modifierWithFocus,
-                inputStyle = inputStyle,
-                fieldUiModel = fieldUiModel,
-                intentHandler = intentHandler,
-                fetchOptions = {
-                    intentHandler(
-                        FormIntent.FetchOptions(
-                            fieldUiModel.uid,
-                            fieldUiModel.optionSet!!,
-                            value = fieldUiModel.value,
-                        ),
-                    )
-                },
-            )
+    // Wrap everything in SensorButtonWrapper so the Connect Sensor button
+    // appears on any field that has a sensor config, regardless of field type.
+    SensorButtonWrapper(
+        fieldUiModel = fieldUiModel,
+        intentHandler = intentHandler,
+        sensorStatus = sensorStatus,
+        isScanning = isScanning,
+        onConnectToSensor = onConnectToSensor,
+        viewModel = viewModel,
+    ) {
+        when {
+            fieldUiModel.optionSet != null && fieldUiModel.valueType != ValueType.MULTI_TEXT ->
+                ProvideByOptionSet(
+                    modifier = modifierWithFocus,
+                    inputStyle = inputStyle,
+                    fieldUiModel = fieldUiModel,
+                    intentHandler = intentHandler,
+                    fetchOptions = {
+                        intentHandler(
+                            FormIntent.FetchOptions(
+                                fieldUiModel.uid,
+                                fieldUiModel.optionSet!!,
+                                value = fieldUiModel.value,
+                            ),
+                        )
+                    },
+                )
 
-        fieldUiModel.customIntent != null -> {
-            ProvideCustomIntentInput(
-                fieldUiModel = fieldUiModel,
-                intentHandler = intentHandler,
-                uiEventHandler = uiEventHandler,
-                resources = resources,
-                inputStyle = inputStyle,
-                reEvaluateRequestParams = reEvaluateCustomIntentRequestParameters,
-                modifier = modifierWithFocus,
-            )
-        }
+            fieldUiModel.customIntent != null ->
+                ProvideCustomIntentInput(
+                    fieldUiModel = fieldUiModel,
+                    intentHandler = intentHandler,
+                    uiEventHandler = uiEventHandler,
+                    resources = resources,
+                    inputStyle = inputStyle,
+                    reEvaluateRequestParams = reEvaluateCustomIntentRequestParameters,
+                    modifier = modifierWithFocus,
+                )
 
-        fieldUiModel.eventCategories != null ->
-            ProvideCategorySelectorInput(
-                modifier = modifierWithFocus,
-                inputStyle = inputStyle,
-                fieldUiModel = fieldUiModel,
-            )
+            fieldUiModel.eventCategories != null ->
+                ProvideCategorySelectorInput(
+                    modifier = modifierWithFocus,
+                    inputStyle = inputStyle,
+                    fieldUiModel = fieldUiModel,
+                )
 
-        else ->
-            SensorButtonWrapper(
-                fieldUiModel = fieldUiModel,
-                intentHandler = intentHandler,
-                sensorStatus = sensorStatus,
-                isScanning = isScanning,
-                onConnectToSensor = onConnectToSensor,
-                viewModel = viewModel
-            ) {
+            else ->
                 ProvideByValueType(
                     modifier = modifierWithFocus,
                     inputStyle = inputStyle,
@@ -197,7 +198,7 @@ fun FieldProvider(
                     focusManager = focusManager,
                     onFileSelected = onFileSelected,
                 )
-            }
+        }
     }
 }
 
@@ -213,25 +214,43 @@ fun SensorButtonWrapper(
 ) {
     val context = LocalContext.current
     val bleAvailable = remember { SensorAvailabilityManager.isBleSupported(context) }
-    
-    val sensorConfig = viewModel?.sensorConfigRepository?.getConfigByDataElement(fieldUiModel.uid)
-    val isSensorRequired = sensorConfig?.sensorRequired ?: false
 
-    val isSensorField = remember(fieldUiModel.label, sensorConfig) {
-        if (sensorConfig != null) {
-            true
-        } else {
+    val sensorConfig = viewModel?.sensorConfigRepository?.getConfigByDataElement(fieldUiModel.uid)
+
+    // Known sensor field UIDs — hardcoded as a guaranteed fallback when DataStore
+    // hasn't loaded yet or viewModel is null (e.g. search screen).
+    val knownSensorUids = setOf(
+        "KXNH45ts16S", // Temperature
+        "VqwQWWDmYLn", // SpO2
+        "tZbUrUbhUNy", // Pulse Rate
+        "S7OjKl85YSh", // Heart Rate
+        "HkfzcXMdLLF", // Systolic BP
+        "skBarAsIYIL", // Diastolic BP
+    )
+
+    val isSensorField = when {
+        sensorConfig != null -> true                          // DataStore match
+        fieldUiModel.uid in knownSensorUids -> true           // hardcoded UID match
+        else -> {
+            // Label keyword fallback
             val label = fieldUiModel.label.lowercase()
             label.contains("temperature") ||
                 label.contains("weight") ||
                 label.contains("heart rate") ||
+                label.contains("heartrate") ||
                 label.contains("systolic") ||
                 label.contains("diastolic") ||
-                label.contains("blood pressure")
+                label.contains("blood pressure") ||
+                label.contains("spo2") ||
+                label.contains("sp02") ||
+                label.contains("oxygen") ||
+                label.contains("saturation") ||
+                label.contains("pulse") ||
+                label.contains("bpm")
         }
     }
 
-    if (bleAvailable && isSensorField && fieldUiModel.editable && (sensorConfig == null || isSensorRequired)) {
+    if (bleAvailable && isSensorField && fieldUiModel.editable) {
         Column(modifier = Modifier.fillMaxWidth()) {
             // Row layout: [Field Content] [Spacer] [Connect Sensor Button]
             Row(
@@ -269,8 +288,10 @@ fun SensorButtonWrapper(
                     text = sensorStatus ?: "Searching...",
                     style = MaterialTheme.typography.bodySmall,
                     color = when {
-                        sensorStatus?.contains("connected", true) == true -> Color(0xFF4CAF50)
-                        sensorStatus?.contains("No connections available", true) == true -> Color(0xFFF44336)
+                        sensorStatus?.startsWith("Data received", ignoreCase = true) == true -> Color(0xFF4CAF50)
+                        sensorStatus?.contains("connected", ignoreCase = true) == true -> Color(0xFF4CAF50)
+                        sensorStatus?.contains("No connections", ignoreCase = true) == true -> Color(0xFFF44336)
+                        sensorStatus?.contains("denied", ignoreCase = true) == true -> Color(0xFFF44336)
                         else -> MaterialTheme.colorScheme.secondary
                     },
                     modifier = Modifier.padding(horizontal = Spacing.Spacing16, vertical = Spacing.Spacing4)

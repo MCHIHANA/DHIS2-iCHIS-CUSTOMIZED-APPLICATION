@@ -2,8 +2,6 @@ package org.dhis2.sensor.ble
 
 import android.bluetooth.BluetoothDevice
 import android.content.Context
-import android.os.Handler
-import android.os.Looper
 import android.util.Log
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -18,7 +16,9 @@ class BleManager(
 ) {
 
     private val bleScanner = BleScanner(context)
-    private val mainHandler = Handler(Looper.getMainLooper())
+
+    /** Guard against duplicate connections when the scan fires multiple times for the same device. */
+    @Volatile private var isConnecting = false
 
     private val _devices = MutableStateFlow<List<BluetoothDevice>>(emptyList())
     val devices: StateFlow<List<BluetoothDevice>> = _devices.asStateFlow()
@@ -27,52 +27,54 @@ class BleManager(
     val connectionState: StateFlow<ConnectionState> = _connectionState.asStateFlow()
 
     /**
-     * Emits sensor readings as (characteristicUUID, parsedValue) pairs.
-     * Observed by FormViewModel to auto-fill the focused form field.
+     * Emits sensor readings as (key, value) pairs.
+     * Keys: "SPO2", "PULSE" for oximeter; characteristic UUID string for thermometer.
      */
-    private val _sensorData = MutableStateFlow<Pair<String, String>?>(null)
-    val sensorData: StateFlow<Pair<String, String>?> = _sensorData.asStateFlow()
+    private val _sensorData = MutableStateFlow<List<Pair<String, String>>>(emptyList())
+    val sensorData: StateFlow<List<Pair<String, String>>> = _sensorData.asStateFlow()
 
     private val bleDeviceConnector = BleDeviceConnector(
         onConnectionStateChanged = { isConnected ->
             _connectionState.value =
                 if (isConnected) ConnectionState.CONNECTED else ConnectionState.DISCONNECTED
+            if (!isConnected) isConnecting = false
+            Log.d(TAG, "Connection state changed: ${_connectionState.value}")
         },
-        onDataReceived = { uuid, value ->
-            _sensorData.value = Pair(uuid, value)
+        onReadingsReceived = { readings ->
+            Log.d(TAG, "Readings received from device: ${readings.size} values")
+            readings.forEach { (key, value) ->
+                Log.d(TAG, "  → $key = $value")
+            }
+            _sensorData.value = readings
         },
     )
 
-    /**
-     * Starts a continuous BLE scan filtered to the Health Thermometer service
-     * (UUID 0x1809). When a matching device is detected the scan stops and a
-     * GATT connection is established on the **main thread** to receive the
-     * temperature measurement.
-     *
-     * Flow:
-     *   1. User taps Temperature field → [startScan] is called
-     *   2. User turns ON the thermometer
-     *   3. Thermometer advertises service UUID 0x1809
-     *   4. Scanner detects it → stops scan → connects via GATT (main thread)
-     *   5. GATT discovers services → subscribes to 0x2A1C (INDICATE)
-     *   6. Thermometer sends measurement → [_sensorData] is updated
-     *   7. FormViewModel observer saves the value to the form field
-     */
     fun startScan() {
         _devices.value = emptyList()
+        isConnecting = false
 
+        Log.d(TAG, "=== BLE SCAN STARTING ===")
+        
         bleScanner.startScan(
             onDeviceFound = { device ->
                 val currentList = _devices.value.toMutableList()
                 if (!currentList.contains(device)) {
                     currentList.add(device)
                     _devices.value = currentList
+                    val deviceName = device.name ?: "Unknown"
+                    Log.d(TAG, "=== DEVICE FOUND: $deviceName (${device.address}) ===")
                 }
             },
             onTargetFound = { device ->
-                Log.d(TAG, "Health Thermometer detected — connecting to ${device.address}")
-                // connectGatt() MUST be called on the main thread to avoid crashes
-                mainHandler.post { connectDevice(device) }
+                // Guard: only connect once even if scan fires multiple callbacks
+                if (isConnecting) {
+                    Log.d(TAG, "Already connecting — ignoring duplicate target: ${device.address}")
+                    return@startScan
+                }
+                isConnecting = true
+                val sensorType = KnownDevices.typeFor(device.address)
+                Log.d(TAG, "=== TARGET SENSOR FOUND: $sensorType (${device.address}) ===")
+                connectDevice(device, sensorType)
             },
         )
     }
@@ -81,13 +83,14 @@ class BleManager(
         bleScanner.stopScan()
     }
 
-    fun connectDevice(device: BluetoothDevice) {
+    fun connectDevice(device: BluetoothDevice, sensorType: SensorType = SensorType.UNKNOWN) {
         stopScan()
         _connectionState.value = ConnectionState.CONNECTING
-        bleDeviceConnector.connect(context, device)
+        bleDeviceConnector.connect(context, device, sensorType)
     }
 
     fun disconnect() {
+        isConnecting = false
         bleDeviceConnector.disconnect()
     }
 
