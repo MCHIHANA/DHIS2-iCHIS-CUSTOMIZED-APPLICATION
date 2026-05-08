@@ -123,9 +123,10 @@ fun SensorConnectionScreen(
     val isScanningMap by viewModel.isFieldScanning.collectAsState()
     val isScanning = isScanningMap[fieldUid] ?: false
     val sensorStatuses by viewModel.sensorStatuses.collectAsState()
-    val status = sensorStatuses[fieldUid] ?: ""
+    val status = sensorStatuses[fieldUid] ?: "Initializing..."
 
     var permissionDenied by remember { mutableStateOf(false) }
+    var scanStartTime by remember { mutableStateOf(0L) }
 
     // Request BLE permissions then start scan
     val permissionLauncher = rememberLauncherForActivityResult(
@@ -133,6 +134,7 @@ fun SensorConnectionScreen(
     ) { results ->
         if (results.values.all { it }) {
             Log.d("SensorBottomSheet", "BLE permissions granted — starting scan")
+            scanStartTime = System.currentTimeMillis()
             viewModel.startSensorScan(fieldUid, secondaryFieldUid)
         } else {
             Log.w("SensorBottomSheet", "BLE permissions denied")
@@ -147,9 +149,20 @@ fun SensorConnectionScreen(
             ContextCompat.checkSelfPermission(context, it) == PackageManager.PERMISSION_GRANTED
         }
         if (allGranted) {
+            scanStartTime = System.currentTimeMillis()
             viewModel.startSensorScan(fieldUid, secondaryFieldUid)
         } else {
             permissionLauncher.launch(BLE_PERMISSIONS)
+        }
+    }
+
+    // Show timeout message after 30 seconds
+    LaunchedEffect(isScanning) {
+        if (isScanning && scanStartTime > 0) {
+            delay(30000) // 30 seconds
+            if (isScanning) {
+                Log.w("SensorBottomSheet", "Scan timeout after 30 seconds")
+            }
         }
     }
 
@@ -199,8 +212,12 @@ fun SensorConnectionScreen(
                         status = "No sensor found. Try again.",
                         isSuccess = false,
                     )
-                    status == "Connecting..." -> BluetoothSensorConnecting()
-                    else -> BluetoothSensorSearching()
+                    status.contains("Place finger", ignoreCase = true) -> BluetoothSensorPlaceFinger(status)
+                    status.contains("Connecting", ignoreCase = true) -> BluetoothSensorConnecting(status)
+                    status.contains("Scanning", ignoreCase = true) || 
+                    status.contains("Waiting", ignoreCase = true) ||
+                    status.contains("Initializing", ignoreCase = true) -> BluetoothSensorSearching(status)
+                    else -> BluetoothSensorSearching(status)
                 }
             }
         },
@@ -221,7 +238,7 @@ fun SensorConnectionScreen(
 }
 
 @Composable
-private fun BluetoothSensorSearching() {
+private fun BluetoothSensorSearching(statusMessage: String = "Waiting for sensor...") {
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -244,7 +261,7 @@ private fun BluetoothSensorSearching() {
         )
         Spacer(modifier = Modifier.height(Spacing.Spacing8))
         Text(
-            text = "Waiting for sensor...",
+            text = statusMessage,
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
@@ -254,7 +271,7 @@ private fun BluetoothSensorSearching() {
 }
 
 @Composable
-private fun BluetoothSensorConnecting() {
+private fun BluetoothSensorConnecting(statusMessage: String = "Connecting...") {
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -263,10 +280,44 @@ private fun BluetoothSensorConnecting() {
         verticalArrangement = Arrangement.Center,
     ) {
         Text(
-            text = "Connecting...",
+            text = statusMessage,
             fontSize = 18.sp,
             fontWeight = FontWeight.Bold,
             style = MaterialTheme.typography.bodyLarge,
+        )
+        Spacer(modifier = Modifier.height(Spacing.Spacing16))
+        ProgressIndicator(type = ProgressIndicatorType.CIRCULAR_SMALL)
+    }
+}
+
+@Composable
+private fun BluetoothSensorPlaceFinger(statusMessage: String = "Place finger on sensor") {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = Spacing.Spacing16),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center,
+    ) {
+        Icon(
+            painter = painterResource(id = R.drawable.ic_bluetooth),
+            contentDescription = null,
+            modifier = Modifier.size(Spacing.Spacing48),
+            tint = Color(0xFF4CAF50), // Green to indicate ready
+        )
+        Spacer(modifier = Modifier.height(Spacing.Spacing8))
+        Text(
+            text = statusMessage,
+            fontSize = 18.sp,
+            fontWeight = FontWeight.Bold,
+            style = MaterialTheme.typography.bodyLarge,
+            color = Color(0xFF4CAF50),
+        )
+        Spacer(modifier = Modifier.height(Spacing.Spacing8))
+        Text(
+            text = "Waiting for reading...",
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         Spacer(modifier = Modifier.height(Spacing.Spacing16))
         ProgressIndicator(type = ProgressIndicatorType.CIRCULAR_SMALL)

@@ -38,9 +38,13 @@ class BleManager(
             _connectionState.value =
                 if (isConnected) ConnectionState.CONNECTED else ConnectionState.DISCONNECTED
             if (!isConnected) isConnecting = false
+            Log.d(TAG, "Connection state changed: ${_connectionState.value}")
         },
         onReadingsReceived = { readings ->
-            Log.d(TAG, "Readings received: $readings")
+            Log.d(TAG, "Readings received from device: ${readings.size} values")
+            readings.forEach { (key, value) ->
+                Log.d(TAG, "  → $key = $value")
+            }
             _sensorData.value = readings
         },
     )
@@ -49,12 +53,16 @@ class BleManager(
         _devices.value = emptyList()
         isConnecting = false
 
+        Log.d(TAG, "=== BLE SCAN STARTING ===")
+        
         bleScanner.startScan(
             onDeviceFound = { device ->
                 val currentList = _devices.value.toMutableList()
                 if (!currentList.contains(device)) {
                     currentList.add(device)
                     _devices.value = currentList
+                    val deviceName = device.name ?: "Unknown"
+                    Log.d(TAG, "=== DEVICE FOUND: $deviceName (${device.address}) ===")
                 }
             },
             onTargetFound = { device ->
@@ -65,7 +73,7 @@ class BleManager(
                 }
                 isConnecting = true
                 val sensorType = KnownDevices.typeFor(device.address)
-                Log.d(TAG, "Sensor detected: $sensorType (${device.address}) — connecting")
+                Log.d(TAG, "=== TARGET SENSOR FOUND: $sensorType (${device.address}) ===")
                 connectDevice(device, sensorType)
             },
         )

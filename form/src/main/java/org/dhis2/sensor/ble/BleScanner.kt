@@ -18,6 +18,11 @@ private const val TAG = "BLE_SCAN"
  */
 private const val HEALTH_THERMOMETER_UUID = "00001809-0000-1000-8000-00805f9b34fb"
 
+/**
+ * Nordic UART service UUID — used by FORA O2 oximeter
+ */
+private const val NORDIC_UART_UUID = "00001523-1212-efde-1523-785feabcd123"
+
 @SuppressLint("MissingPermission")
 class BleScanner(private val context: Context) {
 
@@ -56,7 +61,26 @@ class BleScanner(private val context: Context) {
         onTargetFound: ((BluetoothDevice) -> Unit)? = null,
         onAdvertisementTemperature: ((Double) -> Unit)? = null, // API compat
     ) {
-        if (scanCallback != null) return // already scanning
+        if (scanCallback != null) {
+            Log.w(TAG, "Scan already in progress - stopping and restarting")
+            stopScan()
+        }
+        
+        if (bluetoothAdapter == null) {
+            Log.e(TAG, "Bluetooth adapter is null - cannot scan")
+            return
+        }
+        
+        if (scanner == null) {
+            Log.e(TAG, "BLE scanner is null - cannot scan")
+            return
+        }
+        
+        if (bluetoothAdapter?.isEnabled != true) {
+            Log.e(TAG, "Bluetooth is disabled - cannot scan")
+            return
+        }
+        
         seenDevices.clear()
 
         val settings = ScanSettings.Builder()
@@ -90,9 +114,14 @@ class BleScanner(private val context: Context) {
                     return
                 }
 
-                // 2. FORA device name
-                if (name.contains("FORA", ignoreCase = true)) {
-                    Log.d("BLE_MATCH", "FORA name matched: '$name' ($address)")
+                // 2. FORA device name (including O2, IR42, etc.)
+                // Match: FORA, FORA02, FORA O2, O2, IR42, etc.
+                if (name.contains("FORA", ignoreCase = true) ||
+                    name.contains("O2", ignoreCase = false) ||
+                    name.contains("IR42", ignoreCase = true) ||
+                    name.matches(Regex(".*FORA.*", RegexOption.IGNORE_CASE)) ||
+                    name.matches(Regex(".*O2.*"))) {
+                    Log.d("BLE_MATCH", "FORA/O2 name matched: '$name' ($address)")
                     stopScan()
                     onTargetFound?.invoke(device)
                     return
@@ -100,14 +129,25 @@ class BleScanner(private val context: Context) {
 
                 // 3. Health Thermometer service UUID in advertisement
                 val advertisedServices = result.scanRecord?.serviceUuids
-                if (advertisedServices != null &&
-                    advertisedServices.any {
+                if (advertisedServices != null) {
+                    if (advertisedServices.any {
                         it.uuid.toString().equals(HEALTH_THERMOMETER_UUID, ignoreCase = true)
+                    }) {
+                        Log.d("BLE_MATCH", "Health Thermometer service UUID matched: $address")
+                        stopScan()
+                        onTargetFound?.invoke(device)
+                        return
                     }
-                ) {
-                    Log.d("BLE_MATCH", "Health Thermometer service UUID matched: $address")
-                    stopScan()
-                    onTargetFound?.invoke(device)
+                    
+                    // 4. Nordic UART service UUID (FORA O2 oximeter)
+                    if (advertisedServices.any {
+                        it.uuid.toString().equals(NORDIC_UART_UUID, ignoreCase = true)
+                    }) {
+                        Log.d("BLE_MATCH", "Nordic UART service UUID matched (likely FORA O2): $address")
+                        stopScan()
+                        onTargetFound?.invoke(device)
+                        return
+                    }
                 }
             }
 
@@ -118,8 +158,16 @@ class BleScanner(private val context: Context) {
 
         scanCallback = callback
         // null filters = scan all devices; we do our own matching above
-        scanner?.startScan(null, settings, callback)
-        Log.d(TAG, "Starting continuous unfiltered scan (LOW_LATENCY)...")
+        try {
+            scanner?.startScan(null, settings, callback)
+            Log.d(TAG, "Starting continuous unfiltered scan (LOW_LATENCY)...")
+        } catch (e: SecurityException) {
+            Log.e(TAG, "SecurityException starting scan - missing permissions?", e)
+            scanCallback = null
+        } catch (e: Exception) {
+            Log.e(TAG, "Exception starting scan", e)
+            scanCallback = null
+        }
     }
 
     /** Stops the scan. Called after a match or manually on dismiss. */

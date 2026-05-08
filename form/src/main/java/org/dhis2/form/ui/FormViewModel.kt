@@ -196,6 +196,8 @@ class FormViewModel(
                 ?: repository.currentFocusedItem()?.uid
                 ?: return@onEach
 
+            Log.d("SENSOR_DATA", "Received ${readings.size} readings for primary field: $primaryUid, secondary: $secondarySensorFieldUid")
+
             readings.forEachIndexed { index, (key, value) ->
                 val fieldUid = when (index) {
                     0 -> primaryUid
@@ -203,16 +205,19 @@ class FormViewModel(
                     else -> return@forEachIndexed
                 }
 
-                // Skip UUID mismatch check for custom sensor keys (SPO2, PULSE, etc.)
-                // Only check for standard BLE characteristic UUIDs (contain dashes)
-                val isStandardUuid = key.contains("-")
+                Log.d("SENSOR_DATA", "Processing reading $index: key=$key, value=$value, targetField=$fieldUid")
+
+                // Skip UUID validation for custom sensor keys (SPO2, PULSE, etc.)
+                // These are semantic keys from multi-value sensors, not BLE characteristic UUIDs.
+                // Only validate standard BLE UUIDs (format: xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx)
+                val isStandardUuid = key.matches(Regex("^[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12}$"))
                 if (isStandardUuid) {
                     val expectedConfig = sensorConfigRepository.getConfigByDataElement(fieldUid)
                     if (expectedConfig != null &&
                         expectedConfig.serviceUUID != null &&
-                        expectedConfig.serviceUUID.uppercase() != key.uppercase()
+                        !expectedConfig.serviceUUID.equals(key, ignoreCase = true)
                     ) {
-                        Timber.w("UUID mismatch for $fieldUid: expected ${expectedConfig.serviceUUID}, got $key — skipping")
+                        Log.w("SENSOR_DATA", "UUID mismatch for $fieldUid: expected ${expectedConfig.serviceUUID}, got $key — skipping")
                         return@forEachIndexed
                     }
                 }
@@ -233,11 +238,12 @@ class FormViewModel(
                  ?: repository.currentFocusedItem()?.uid
                  ?: return@onEach
              val status = when(state) {
-                 org.dhis2.sensor.ble.BleManager.ConnectionState.CONNECTED -> "Connected"
-                 org.dhis2.sensor.ble.BleManager.ConnectionState.CONNECTING -> "Connecting..."
+                 org.dhis2.sensor.ble.BleManager.ConnectionState.CONNECTED -> "Connected - Place finger on sensor now!"
+                 org.dhis2.sensor.ble.BleManager.ConnectionState.CONNECTING -> "Connecting to sensor..."
                  org.dhis2.sensor.ble.BleManager.ConnectionState.DISCONNECTED -> "Disconnected"
                  org.dhis2.sensor.ble.BleManager.ConnectionState.DISCONNECTING -> "Disconnecting..."
              }
+             Log.d(TAG, "Connection state changed: $status")
              _sensorStatuses.update { it + (fieldUid to status) }
              // Also update secondary field status for multi-value sensors
              secondarySensorFieldUid?.let { secUid ->
@@ -1212,6 +1218,7 @@ class FormViewModel(
      *                          (pulse rate for oximeter). Null for single-value sensors.
      */
     fun startSensorScan(primaryFieldUid: String, secondaryFieldUid: String? = null) {
+        Log.d(TAG, "startSensorScan called: primary=$primaryFieldUid, secondary=$secondaryFieldUid")
         activeSensorFieldUid = primaryFieldUid
         secondarySensorFieldUid = secondaryFieldUid
         _isFieldScanning.update { map ->
@@ -1220,11 +1227,22 @@ class FormViewModel(
             m
         }
         _sensorStatuses.update { map ->
-            var m = map + (primaryFieldUid to "Waiting for sensor...")
-            if (secondaryFieldUid != null) m = m + (secondaryFieldUid to "Waiting for sensor...")
+            var m = map + (primaryFieldUid to "Scanning for sensor...")
+            if (secondaryFieldUid != null) m = m + (secondaryFieldUid to "Scanning for sensor...")
             m
         }
-        bleManager.startScan()
+        Log.d(TAG, "Starting BLE scan via bleManager")
+        try {
+            bleManager.startScan()
+            Log.d(TAG, "BLE scan started successfully")
+        } catch (e: Exception) {
+            Log.e(TAG, "Error starting BLE scan", e)
+            _sensorStatuses.update { map ->
+                var m = map + (primaryFieldUid to "Error: ${e.message}")
+                if (secondaryFieldUid != null) m = m + (secondaryFieldUid to "Error: ${e.message}")
+                m
+            }
+        }
     }
 
     /** Called when the sensor dialog is dismissed — stops scan and clears field tracking. */
