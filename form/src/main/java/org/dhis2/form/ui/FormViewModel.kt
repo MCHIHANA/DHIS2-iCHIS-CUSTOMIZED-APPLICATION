@@ -188,6 +188,17 @@ class FormViewModel(
      */
     private var secondarySensorFieldUid: String? = null
 
+    /**
+     * Hardcoded BP sensor field UIDs.
+     * These map the semantic keys sent by the FORA D40b BP sensor to DHIS2 data element UIDs.
+     * This avoids relying on DataStore configuration which has proven unreliable at runtime.
+     */
+    private val bpFieldMap = mapOf(
+        "SYSTOLIC"  to "HkfzcXMdLLF",
+        "DIASTOLIC" to "BaGxiB8AsNI",
+        "PULSE"     to "S7OjKl85YSh"
+    )
+
     private fun observeSensorData() {
         bleManager.sensorData.onEach { readings ->
             if (readings.isEmpty()) return@onEach
@@ -196,25 +207,35 @@ class FormViewModel(
                 ?: repository.currentFocusedItem()?.uid
                 ?: return@onEach
 
-            Log.d("SENSOR_DATA", "Received ${readings.size} readings for primary field: $primaryUid, secondary: $secondarySensorFieldUid")
+            Log.d("SENSOR_DATA", "Received ${readings.size} readings for primary field: $primaryUid")
 
-            // Get sensor configuration to map semantic keys to data element UIDs
-            val sensorConfig = sensorConfigRepository.getConfigByDataElement(primaryUid)
-            Log.d("SENSOR_DATA", "Sensor config found: ${sensorConfig?.name}, type: ${sensorConfig?.type}, measurements: ${sensorConfig?.measurements?.keys}")
-            
-            // Check if this is a multi-measurement sensor with semantic keys
-            val isMultiMeasurement = sensorConfig?.isMultiMeasurement() == true
-            Log.d("SENSOR_DATA", "isMultiMeasurement: $isMultiMeasurement")
-            
-            if (isMultiMeasurement && sensorConfig != null) {
-                // Multi-measurement sensor: map semantic keys to data element UIDs
-                Log.d("SENSOR_DATA", "Multi-measurement sensor detected: ${sensorConfig.name}")
-                
+            // Check if ALL incoming keys are BP semantic keys (SYSTOLIC / DIASTOLIC / PULSE).
+            // If so, use the hardcoded map regardless of which field the user tapped.
+            val allAreBpKeys = readings.isNotEmpty() &&
+                readings.all { (key, _) -> key.uppercase() in bpFieldMap }
+
+            if (allAreBpKeys) {
+                Log.d("SENSOR_DATA", "BP sensor detected — using hardcoded field mapping")
                 readings.forEach { (key, value) ->
-                    // Map semantic key (e.g., "SYSTOLIC", "DIASTOLIC", "PULSE") to data element UID
-                    val measurementKey = key.lowercase()
-                    val fieldUid = sensorConfig.measurements?.get(measurementKey)?.dataElement
-                    
+                    val fieldUid = bpFieldMap[key.uppercase()]!!
+                    Log.d("SENSOR_DATA", "Mapping $key → $fieldUid")
+                    Log.d("SENSOR_SAVE", "Saving $key=$value to field $fieldUid")
+                    submitIntent(FormIntent.OnSave(fieldUid, value, ValueType.NUMBER))
+                    _sensorStatuses.update { it + (fieldUid to "Data received: $value") }
+                    _isFieldScanning.update { it + (fieldUid to false) }
+                }
+                return@onEach
+            }
+
+            // For all other sensors try DataStore config first, then fall back to
+            // index-based mapping (covers temperature, oximeter, etc.).
+            val sensorConfig = sensorConfigRepository.getConfigByDataElement(primaryUid)
+            val isMultiMeasurement = sensorConfig?.isMultiMeasurement() == true
+            Log.d("SENSOR_DATA", "Sensor config found: ${sensorConfig?.name}, isMultiMeasurement: $isMultiMeasurement")
+
+            if (isMultiMeasurement && sensorConfig != null) {
+                readings.forEach { (key, value) ->
+                    val fieldUid = sensorConfig.measurements?.get(key.lowercase())?.dataElement
                     if (fieldUid != null) {
                         Log.d("SENSOR_DATA", "Mapping $key → $fieldUid")
                         Log.d("SENSOR_SAVE", "Saving $key=$value to field $fieldUid")
@@ -222,11 +243,11 @@ class FormViewModel(
                         _sensorStatuses.update { it + (fieldUid to "Data received: $value") }
                         _isFieldScanning.update { it + (fieldUid to false) }
                     } else {
-                        Log.w("SENSOR_DATA", "No mapping found for measurement key: $key")
+                        Log.w("SENSOR_DATA", "No mapping found for key: $key")
                     }
                 }
             } else {
-                // Legacy behavior: use index-based mapping for single/dual-value sensors
+                // Legacy index-based mapping (single-value sensors like temperature)
                 Log.d("SENSOR_DATA", "Using legacy index-based mapping")
                 readings.forEachIndexed { index, (key, value) ->
                     val fieldUid = when (index) {
@@ -234,24 +255,6 @@ class FormViewModel(
                         1 -> secondarySensorFieldUid ?: return@forEachIndexed
                         else -> return@forEachIndexed
                     }
-
-                    Log.d("SENSOR_DATA", "Processing reading $index: key=$key, value=$value, targetField=$fieldUid")
-
-                    // Skip UUID validation for custom sensor keys (SPO2, PULSE, etc.)
-                    // These are semantic keys from multi-value sensors, not BLE characteristic UUIDs.
-                    // Only validate standard BLE UUIDs (format: xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx)
-                    val isStandardUuid = key.matches(Regex("^[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12}$"))
-                    if (isStandardUuid) {
-                        val expectedConfig = sensorConfigRepository.getConfigByDataElement(fieldUid)
-                        if (expectedConfig != null &&
-                            expectedConfig.serviceUUID != null &&
-                            !expectedConfig.serviceUUID.equals(key, ignoreCase = true)
-                        ) {
-                            Log.w("SENSOR_DATA", "UUID mismatch for $fieldUid: expected ${expectedConfig.serviceUUID}, got $key — skipping")
-                            return@forEachIndexed
-                        }
-                    }
-
                     Log.d("SENSOR_SAVE", "Saving $key=$value to field $fieldUid")
                     submitIntent(FormIntent.OnSave(fieldUid, value, ValueType.NUMBER))
                     _sensorStatuses.update { it + (fieldUid to "Data received: $value") }
