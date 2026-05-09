@@ -23,6 +23,11 @@ private const val HEALTH_THERMOMETER_UUID = "00001809-0000-1000-8000-00805f9b34f
  */
 private const val NORDIC_UART_UUID = "00001523-1212-efde-1523-785feabcd123"
 
+/**
+ * Blood Pressure service UUID (Bluetooth SIG standard)
+ */
+private const val BLOOD_PRESSURE_UUID = "00001810-0000-1000-8000-00805f9b34fb"
+
 @SuppressLint("MissingPermission")
 class BleScanner(private val context: Context) {
 
@@ -144,6 +149,16 @@ class BleScanner(private val context: Context) {
                         it.uuid.toString().equals(NORDIC_UART_UUID, ignoreCase = true)
                     }) {
                         Log.d("BLE_MATCH", "Nordic UART service UUID matched (likely FORA O2): $address")
+                        stopScan()
+                        onTargetFound?.invoke(device)
+                        return
+                    }
+                    
+                    // 5. Blood Pressure service UUID (0x1810)
+                    if (advertisedServices.any {
+                        it.uuid.toString().equals(BLOOD_PRESSURE_UUID, ignoreCase = true)
+                    }) {
+                        Log.d("BLE_MATCH", "Blood Pressure service UUID matched: $address")
                         stopScan()
                         onTargetFound?.invoke(device)
                         return

@@ -26,6 +26,10 @@ private val CCCD_UUID         = UUID.fromString("00002902-0000-1000-8000-00805f9
 private val NORDIC_SERVICE_UUID = UUID.fromString("00001523-1212-efde-1523-785feabcd123")
 private val NORDIC_BUTTON_UUID  = UUID.fromString("00001524-1212-efde-1523-785feabcd123")
 
+// ── Blood Pressure service UUIDs (Bluetooth SIG standard) ────────────────────
+private val BP_SERVICE_UUID = UUID.fromString("00001810-0000-1000-8000-00805f9b34fb")
+private val BP_MEASUREMENT_UUID = UUID.fromString("00002A35-0000-1000-8000-00805f9b34fb")
+
 @SuppressLint("MissingPermission")
 class BleDeviceConnector(
     private val onConnectionStateChanged: (Boolean) -> Unit,
@@ -87,6 +91,7 @@ class BleDeviceConnector(
             when (currentSensorType) {
                 SensorType.SPO2        -> subscribeForaO2(gatt)
                 SensorType.TEMPERATURE -> subscribeThermometer(gatt)
+                SensorType.BLOOD_PRESSURE -> subscribeBloodPressure(gatt)
                 else                   -> enableAllNotifiableCharacteristics(gatt)
             }
         }
@@ -193,9 +198,10 @@ class BleDeviceConnector(
 
     private fun dispatchReading(uuid: String, data: ByteArray) {
         when (currentSensorType) {
-            SensorType.SPO2        -> handleForaO2Data(uuid, data)
-            SensorType.TEMPERATURE -> handleTemperatureData(uuid, data)
-            else                   -> handleGenericData(uuid, data)
+            SensorType.SPO2           -> handleForaO2Data(uuid, data)
+            SensorType.TEMPERATURE    -> handleTemperatureData(uuid, data)
+            SensorType.BLOOD_PRESSURE -> handleBloodPressureData(uuid, data)
+            else                      -> handleGenericData(uuid, data)
         }
     }
 
@@ -413,6 +419,77 @@ class BleDeviceConnector(
         onReadingsReceived(listOf(Pair(uuid, "%.1f".format(value))))
     }
 
+    // ── Blood Pressure ────────────────────────────────────────────────────────
+
+    /**
+     * Subscribes to Blood Pressure Measurement characteristic (0x2A35).
+     * Uses INDICATE mode as per Bluetooth SIG Blood Pressure Profile specification.
+     */
+    private fun subscribeBloodPressure(gatt: BluetoothGatt) {
+        Log.d(TAG_SERVICE, "*** subscribeBloodPressure called ***")
+        val service = gatt.getService(BP_SERVICE_UUID)
+        if (service == null) {
+            Log.w(TAG_SERVICE, "!!! Blood Pressure service NOT FOUND — enabling all notifiable characteristics !!!")
+            enableAllNotifiableCharacteristics(gatt)
+            return
+        }
+        Log.d(TAG_SERVICE, "✓ Found Blood Pressure service: ${service.uuid}")
+        
+        val bpChar = service.getCharacteristic(BP_MEASUREMENT_UUID)
+        if (bpChar != null) {
+            Log.d(TAG_SERVICE, "✓ Found BP Measurement characteristic: ${bpChar.uuid}, properties=${bpChar.properties}")
+            // Blood Pressure uses INDICATE mode (not NOTIFY)
+            enableCharacteristic(gatt, bpChar, indicate = true)
+            Log.d(TAG_SERVICE, "Subscribed to Blood Pressure Measurement (INDICATE)")
+        } else {
+            Log.w(TAG_SERVICE, "!!! BP Measurement characteristic NOT FOUND — enabling all !!!")
+            enableAllNotifiableCharacteristics(gatt)
+        }
+    }
+
+    /**
+     * Parses Blood Pressure Measurement packets (0x2A35) and emits readings.
+     *
+     * The FORA D40b sends:
+     * - Systolic pressure (mmHg)
+     * - Diastolic pressure (mmHg)
+     * - MAP (Mean Arterial Pressure)
+     * - Pulse rate (bpm) - optional
+     *
+     * All values are parsed using IEEE-11073 16-bit SFLOAT format.
+     * Readings are emitted as semantic keys: "SYSTOLIC", "DIASTOLIC", "PULSE"
+     */
+    private fun handleBloodPressureData(uuid: String, data: ByteArray) {
+        Log.d("BLE_BP", "Blood Pressure raw (${data.size}B): ${data.joinToString { "%02X".format(it) }}")
+
+        val reading = BleDataParser.parseBloodPressure(data)
+        
+        // Validate readings are in plausible range
+        if (reading.systolic < 50f || reading.systolic > 250f ||
+            reading.diastolic < 30f || reading.diastolic > 150f) {
+            Log.w("BLE_BP", "Blood pressure values out of range — skipping")
+            return
+        }
+
+        Log.d("BLE_BP", "✓ Valid BP reading: ${reading.systolic.toInt()}/${reading.diastolic.toInt()} mmHg")
+        
+        // Build readings list with semantic keys
+        val readings = mutableListOf(
+            Pair("SYSTOLIC", reading.systolic.toInt().toString()),
+            Pair("DIASTOLIC", reading.diastolic.toInt().toString())
+        )
+        
+        // Add pulse rate if present and valid
+        reading.pulseRate?.let { pulse ->
+            if (pulse in 30f..250f) {
+                readings.add(Pair("PULSE", pulse.toInt().toString()))
+                Log.d("BLE_BP", "  Pulse: ${pulse.toInt()} bpm")
+            }
+        }
+        
+        onReadingsReceived(readings)
+    }
+
     // ── Generic fallback ──────────────────────────────────────────────────────
 
     private fun handleGenericData(uuid: String, data: ByteArray) {
@@ -424,8 +501,19 @@ class BleDeviceConnector(
             }
             uuid.contains("2A37") -> BleDataParser.parseHeartRate(data).toString()
             uuid.contains("2A35") -> {
-                val bp = BleDataParser.parseBloodPressure(data)
-                "${bp.first}/${bp.second}"
+                // Blood Pressure — return as multi-value readings
+                val reading = BleDataParser.parseBloodPressure(data)
+                val readings = mutableListOf(
+                    Pair("SYSTOLIC", reading.systolic.toInt().toString()),
+                    Pair("DIASTOLIC", reading.diastolic.toInt().toString())
+                )
+                reading.pulseRate?.let { pulse ->
+                    if (pulse in 30f..250f) {
+                        readings.add(Pair("PULSE", pulse.toInt().toString()))
+                    }
+                }
+                onReadingsReceived(readings)
+                return
             }
             uuid.contains("2A5E") || uuid.contains("2A5F") ->
                 BleDataParser.parseSpO2(data).toString()

@@ -69,8 +69,47 @@ class SensorConfigRepository(
     }
 
     fun getConfigByDataElement(uid: String): SensorConfig? {
-        return sensorConfigFlow.value.find { 
-            it.dataElement == uid || it.dataElements?.systolic == uid || it.dataElements?.diastolic == uid
+        return sensorConfigFlow.value.find { config ->
+            // Check legacy single-value
+            if (config.dataElement == uid) return@find true
+            
+            // Check legacy dual-value (systolic/diastolic)
+            if (config.dataElements?.systolic == uid || config.dataElements?.diastolic == uid) {
+                return@find true
+            }
+            
+            // Check new multi-measurement structure
+            config.measurements?.values?.any { it.dataElement == uid } == true
         }
+    }
+    
+    /**
+     * Returns all data element UIDs for a given sensor configuration.
+     * Supports both legacy and new multi-measurement structures.
+     */
+    fun getDataElementsForConfig(config: SensorConfig): List<String> {
+        val elements = mutableListOf<String>()
+        
+        // New multi-measurement structure
+        config.measurements?.values?.forEach { measurement ->
+            elements.add(measurement.dataElement)
+        }
+        
+        // Legacy structures
+        config.dataElement?.let { elements.add(it) }
+        config.dataElements?.let {
+            elements.add(it.systolic)
+            elements.add(it.diastolic)
+        }
+        
+        return elements
+    }
+    
+    /**
+     * Maps a measurement key (e.g., "systolic", "pulse") to its data element UID.
+     * Returns null if the measurement is not configured.
+     */
+    fun getDataElementForMeasurement(config: SensorConfig, measurementKey: String): String? {
+        return config.measurements?.get(measurementKey)?.dataElement
     }
 }
