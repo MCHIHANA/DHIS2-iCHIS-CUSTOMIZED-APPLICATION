@@ -225,7 +225,7 @@ fun SensorButtonWrapper(
         "tZbUrUbhUNy", // Pulse Rate
         "S7OjKl85YSh", // Heart Rate
         "HkfzcXMdLLF", // Systolic BP
-        "skBarAsIYIL", // Diastolic BP
+        "BaGxiB8AsNI", // Diastolic BP (updated to match your DHIS2)
     )
 
     val isSensorField = when {

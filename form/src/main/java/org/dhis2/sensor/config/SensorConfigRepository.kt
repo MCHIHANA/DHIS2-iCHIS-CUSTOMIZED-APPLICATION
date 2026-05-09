@@ -17,20 +17,34 @@ class SensorConfigRepository(
     private val sharedPreferences = context.getSharedPreferences("sensor_config_prefs", Context.MODE_PRIVATE)
 
     suspend fun fetchSensorConfig() {
+        Log.d("SensorConfig", "=== fetchSensorConfig() called ===")
         try {
+            Log.d("SensorConfig", "Calling API to fetch sensor config...")
             val response = api.getSensorConfig()
+            Log.d("SensorConfig", "API call successful! Received ${response.sensors.size} sensors")
             sensorConfigFlow.value = response.sensors
             cacheConfig(response)
-            Log.d("SensorConfig", "Loaded sensors: ${response.sensors.size}")
+            Log.d("SensorConfig", "✓ Loaded sensors: ${response.sensors.size}")
             response.sensors.forEach { sensor ->
-                Log.d("SensorConfig", sensor.name)
+                Log.d("SensorConfig", "  - ${sensor.name}")
                 if (sensor.serviceUUID != null) {
-                    Log.d("SensorConfig", sensor.serviceUUID)
+                    Log.d("SensorConfig", "    Service UUID: ${sensor.serviceUUID}")
+                }
+                if (sensor.measurements != null) {
+                    Log.d("SensorConfig", "    Measurements: ${sensor.measurements.keys}")
                 }
             }
+            Log.d("SensorConfig", "=== Config loaded successfully ===")
         } catch (e: Exception) {
-            Log.e("SensorConfig", "Fetch failed — loading cache", e)
+            Log.e("SensorConfig", "❌ Fetch failed! Error: ${e.message}", e)
+            Log.e("SensorConfig", "Exception type: ${e.javaClass.simpleName}")
+            Log.d("SensorConfig", "Attempting to load from cache...")
             loadFromCache()
+            if (sensorConfigFlow.value.isEmpty()) {
+                Log.e("SensorConfig", "❌ Cache is also empty! No sensor config available.")
+            } else {
+                Log.d("SensorConfig", "✓ Loaded ${sensorConfigFlow.value.size} sensors from cache")
+            }
         }
     }
 
@@ -44,13 +58,20 @@ class SensorConfigRepository(
     }
 
     private fun loadFromCache() {
+        Log.d("SensorConfig", "Loading from SharedPreferences cache...")
         val json = sharedPreferences.getString("sensor_config", null)
+        if (json == null) {
+            Log.w("SensorConfig", "No cached config found in SharedPreferences")
+            return
+        }
+        Log.d("SensorConfig", "Found cached config (${json.length} chars)")
         json?.let {
             try {
                 val cached = Gson().fromJson(it, SensorConfigResponse::class.java)
                 sensorConfigFlow.value = cached.sensors
+                Log.d("SensorConfig", "✓ Successfully loaded ${cached.sensors.size} sensors from cache")
             } catch (e: Exception) {
-                Log.e("SensorConfig", "Cache parsing failed", e)
+                Log.e("SensorConfig", "❌ Cache parsing failed", e)
             }
         }
     }

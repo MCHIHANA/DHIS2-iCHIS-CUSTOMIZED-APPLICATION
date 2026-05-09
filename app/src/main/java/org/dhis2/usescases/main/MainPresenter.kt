@@ -2,6 +2,7 @@ package org.dhis2.usescases.main
 
 import android.content.Context
 import android.net.Uri
+import android.util.Log
 import android.view.Gravity
 import androidx.core.net.toUri
 import androidx.lifecycle.MutableLiveData
@@ -143,8 +144,15 @@ class MainPresenter(
     }
 
     private fun fetchSensorConfig() {
+        Log.d("MainPresenter", "=== fetchSensorConfig() called in MainPresenter ===")
         launch {
-            sensorConfigRepository.fetchSensorConfig()
+            Log.d("MainPresenter", "Launching coroutine to fetch sensor config...")
+            try {
+                sensorConfigRepository.fetchSensorConfig()
+                Log.d("MainPresenter", "✓ Sensor config fetch completed")
+            } catch (e: Exception) {
+                Log.e("MainPresenter", "❌ Error fetching sensor config", e)
+            }
         }
     }
 

@@ -1,0 +1,27 @@
+{
+  "sensors": [
+    {
+      "name": "Blood Pressure Monitor",
+      "type": "multi",
+      "serviceUUID": "00001810-0000-1000-8000-00805f9b34fb",
+      "characteristicUUID": "00002A35-0000-1000-8000-00805f9b34fb",
+      "macAddress": "C0:26:DA:19:D4:FE",
+      "measurements": {
+        "systolic": {
+          "dataElement": "HkfzcXMdLLF",
+          "unit": "mmHg"
+        },
+        "diastolic": {
+          "dataElement": "BaGxiB8AsNI",
+          "unit": "mmHg"
+        },
+        "pulse": {
+          "dataElement": "S7OjKl85YSh",
+          "unit": "bpm"
+        }
+      },
+      "sensorRequired": false,
+      "manualAllowed": true
+    }
+  ]
+}
