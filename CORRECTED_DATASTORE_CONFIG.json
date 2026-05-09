@@ -1,0 +1,67 @@
+{
+  "globalSettings": {
+    "allowManualFallback": true,
+    "allowManualWhenNoSensorAvailable": true,
+    "allowManualWhenSensorFails": true,
+    "enableMockMode": false
+  },
+  "sensors": [
+    {
+      "characteristicUUID": "00002A1C-0000-1000-8000-00805f9b34fb",
+      "macAddress": "C0:26:DA:1B:06:A4",
+      "manualAllowed": true,
+      "measurements": {
+        "temperature": {
+          "dataElement": "KXNH45ts16S",
+          "unit": "°C"
+        }
+      },
+      "name": "Temperature",
+      "sensorRequired": true,
+      "serviceUUID": "00001809-0000-1000-8000-00805f9b34fb",
+      "type": "single"
+    },
+    {
+      "characteristicUUID": "00001524-1212-efde-1523-785feabcd123",
+      "macAddress": "C0:26:DA:17:D5:7D",
+      "manualAllowed": true,
+      "measurements": {
+        "pulseRate": {
+          "dataElement": "tZbUrUbhUNy",
+          "unit": "bpm"
+        },
+        "spo2": {
+          "dataElement": "VqwQWWDmYLn",
+          "unit": "%"
+        }
+      },
+      "name": "Pulse Oximeter",
+      "sensorRequired": true,
+      "serviceUUID": "00001523-1212-efde-1523-785feabcd123",
+      "type": "multi"
+    },
+    {
+      "characteristicUUID": "00002A35-0000-1000-8000-00805f9b34fb",
+      "macAddress": "C0:26:DA:19:D4:FE",
+      "manualAllowed": true,
+      "measurements": {
+        "diastolic": {
+          "dataElement": "BaGxiB8AsNI",
+          "unit": "mmHg"
+        },
+        "pulse": {
+          "dataElement": "S7OjKl85YSh",
+          "unit": "bpm"
+        },
+        "systolic": {
+          "dataElement": "HkfzcXMdLLF",
+          "unit": "mmHg"
+        }
+      },
+      "name": "Blood Pressure",
+      "sensorRequired": true,
+      "serviceUUID": "00001810-0000-1000-8000-00805f9b34fb",
+      "type": "multi"
+    }
+  ]
+}
