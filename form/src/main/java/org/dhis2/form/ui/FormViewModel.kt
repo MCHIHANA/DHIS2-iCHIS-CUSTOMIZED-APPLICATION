@@ -200,9 +200,11 @@ class FormViewModel(
 
             // Get sensor configuration to map semantic keys to data element UIDs
             val sensorConfig = sensorConfigRepository.getConfigByDataElement(primaryUid)
+            Log.d("SENSOR_DATA", "Sensor config found: ${sensorConfig?.name}, type: ${sensorConfig?.type}, measurements: ${sensorConfig?.measurements?.keys}")
             
             // Check if this is a multi-measurement sensor with semantic keys
             val isMultiMeasurement = sensorConfig?.isMultiMeasurement() == true
+            Log.d("SENSOR_DATA", "isMultiMeasurement: $isMultiMeasurement")
             
             if (isMultiMeasurement && sensorConfig != null) {
                 // Multi-measurement sensor: map semantic keys to data element UIDs
@@ -218,6 +220,49 @@ class FormViewModel(
                         Log.d("SENSOR_SAVE", "Saving $key=$value to field $fieldUid")
                         submitIntent(FormIntent.OnSave(fieldUid, value, ValueType.NUMBER))
                         _sensorStatuses.update { it + (fieldUid to "Data received: $value") }
+                        _isFieldScanning.update { it + (fieldUid to false) }
+                    } else {
+                        Log.w("SENSOR_DATA", "No mapping found for measurement key: $key")
+                    }
+                }
+            } else {
+                // Legacy behavior: use index-based mapping for single/dual-value sensors
+                Log.d("SENSOR_DATA", "Using legacy index-based mapping")
+                readings.forEachIndexed { index, (key, value) ->
+                    val fieldUid = when (index) {
+                        0 -> primaryUid
+                        1 -> secondarySensorFieldUid ?: return@forEachIndexed
+                        else -> return@forEachIndexed
+                    }
+
+                    Log.d("SENSOR_DATA", "Processing reading $index: key=$key, value=$value, targetField=$fieldUid")
+
+                    // Skip UUID validation for custom sensor keys (SPO2, PULSE, etc.)
+                    // These are semantic keys from multi-value sensors, not BLE characteristic UUIDs.
+                    // Only validate standard BLE UUIDs (format: xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx)
+                    val isStandardUuid = key.matches(Regex("^[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12}$"))
+                    if (isStandardUuid) {
+                        val expectedConfig = sensorConfigRepository.getConfigByDataElement(fieldUid)
+                        if (expectedConfig != null &&
+                            expectedConfig.serviceUUID != null &&
+                            !expectedConfig.serviceUUID.equals(key, ignoreCase = true)
+                        ) {
+                            Log.w("SENSOR_DATA", "UUID mismatch for $fieldUid: expected ${expectedConfig.serviceUUID}, got $key — skipping")
+                            return@forEachIndexed
+                        }
+                    }
+
+                    Log.d("SENSOR_SAVE", "Saving $key=$value to field $fieldUid")
+                    submitIntent(FormIntent.OnSave(fieldUid, value, ValueType.NUMBER))
+                    _sensorStatuses.update { it + (fieldUid to "Data received: $value") }
+                    _isFieldScanning.update { it + (fieldUid to false) }
+                }
+            }
+
+            // Don't clear activeSensorFieldUid here — keep it so repeated readings
+            // (e.g. continuous oximeter updates) keep going to the right field.
+            // It will be cleared when the dialog is dismissed.
+        }.launchIn(viewModelScope)
                         _isFieldScanning.update { it + (fieldUid to false) }
                     } else {
                         Log.w("SENSOR_DATA", "No mapping found for measurement key: $key")
