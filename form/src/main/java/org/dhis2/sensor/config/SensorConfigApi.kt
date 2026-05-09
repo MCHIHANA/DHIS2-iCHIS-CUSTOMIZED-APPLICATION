@@ -1,5 +1,6 @@
 package org.dhis2.sensor.config
 
+import android.util.Log
 import org.hisp.dhis.android.core.D2
 import com.google.gson.Gson
 
