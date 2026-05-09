@@ -20,8 +20,8 @@ data class SensorConfigResponse(
  *   "macAddress": "C0:26:DA:19:D4:FE",
  *   "measurements": {
  *     "systolic": {"dataElement": "HkfzcXMdLLF", "unit": "mmHg"},
- *     "diastolic": {"dataElement": "skBarAsIYIL", "unit": "mmHg"},
- *     "pulse": {"dataElement": "tZbUrUbhUNy", "unit": "bpm"}
+ *     "diastolic": {"dataElement": "BaGxiB8AsNI", "unit": "mmHg"},
+ *     "pulse": {"dataElement": "S7OjKl85YSh", "unit": "bpm"}
  *   }
  * }
  * ```
