@@ -16,6 +16,9 @@ object BleHealthUUIDs {
     val SPO2_SERVICE: UUID =
         UUID.fromString("00001822-0000-1000-8000-00805f9b34fb")
 
+    val GLUCOSE_SERVICE: UUID =
+        UUID.fromString("00001808-0000-1000-8000-00805f9b34fb")
+
     // Characteristics
     val TEMPERATURE_MEASUREMENT_CHAR: UUID =
         UUID.fromString("00002A1C-0000-1000-8000-00805f9b34fb")
@@ -29,6 +32,15 @@ object BleHealthUUIDs {
     val SPO2_MEASUREMENT_CHAR: UUID =
         UUID.fromString("00002A5F-0000-1000-8000-00805f9b34fb")
 
+    val GLUCOSE_MEASUREMENT_CHAR: UUID =
+        UUID.fromString("00002A18-0000-1000-8000-00805f9b34fb")
+
+    val GLUCOSE_MEASUREMENT_CONTEXT_CHAR: UUID =
+        UUID.fromString("00002A34-0000-1000-8000-00805f9b34fb")
+
     val CLIENT_CHARACTERISTIC_CONFIG: UUID =
         UUID.fromString("00002902-0000-1000-8000-00805f9b34fb")
+
+    // FORA D40 Glucometer MAC Address
+    const val FORA_D40_GLUCOMETER_MAC = "C0:26:DA:19:D4:FE"
 }

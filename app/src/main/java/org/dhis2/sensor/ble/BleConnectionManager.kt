@@ -31,6 +31,13 @@ class BleConnectionManager(private val context: Context) {
         data class HeartRate(val value: Int) : SensorData()
         data class BloodPressure(val systolic: Int, val diastolic: Int) : SensorData()
         data class SpO2(val value: Int) : SensorData()
+        data class Glucose(
+            val value: Float,
+            val unit: String,
+            val sequenceNumber: Int,
+            val timestamp: String?,
+            val typeSampleLocation: String?
+        ) : SensorData()
     }
 
     private val gattCallback = object : BluetoothGattCallback() {
@@ -77,6 +84,16 @@ class BleConnectionManager(private val context: Context) {
                 BleHealthUUIDs.SPO2_MEASUREMENT_CHAR -> {
                     SensorData.SpO2(BleDataParser.parseSpO2(data))
                 }
+                BleHealthUUIDs.GLUCOSE_MEASUREMENT_CHAR -> {
+                    val glucose = BleDataParser.parseGlucose(data)
+                    SensorData.Glucose(
+                        value = glucose.value,
+                        unit = glucose.unit,
+                        sequenceNumber = glucose.sequenceNumber,
+                        timestamp = glucose.timestamp,
+                        typeSampleLocation = glucose.typeSampleLocation
+                    )
+                }
                 else -> null
             }
 
@@ -121,6 +138,7 @@ class BleConnectionManager(private val context: Context) {
         return uuid == BleHealthUUIDs.TEMPERATURE_MEASUREMENT_CHAR ||
                uuid == BleHealthUUIDs.HEART_RATE_MEASUREMENT_CHAR ||
                uuid == BleHealthUUIDs.BLOOD_PRESSURE_MEASUREMENT_CHAR ||
-               uuid == BleHealthUUIDs.SPO2_MEASUREMENT_CHAR
+               uuid == BleHealthUUIDs.SPO2_MEASUREMENT_CHAR ||
+               uuid == BleHealthUUIDs.GLUCOSE_MEASUREMENT_CHAR
     }
 }

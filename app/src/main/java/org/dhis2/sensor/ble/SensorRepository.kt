@@ -30,6 +30,10 @@ class SensorRepository(context: Context) {
         (it as? BleConnectionManager.SensorData.SpO2)?.value
     }
 
+    val glucoseFlow: Flow<BleConnectionManager.SensorData.Glucose?> = sensorData.map {
+        it as? BleConnectionManager.SensorData.Glucose
+    }
+
     fun connect(device: BluetoothDevice) {
         bleConnectionManager.connect(device)
     }
