@@ -1,0 +1,27 @@
+## This file must *NOT* be checked into Version Control Systems,
+# as it contains information specific to your local configuration.
+#
+# Location of the SDK. This is only used by Gradle.
+# For customization when using a Version Control System, please read the
+# header note.
+#sdk.dir=C\:\\Users\\YourUsername\\AppData\\Local\\Android\\Sdk
+
+# DHIS2 Oximeter Configuration
+# These credentials are used for submitting oximeter readings to DHIS2
+# IMPORTANT: Store these securely and never commit to version control
+#
+# For production, consider using EncryptedSharedPreferences instead
+# of hardcoding credentials in the app
+
+# DHIS2 Server URL
+dhis2.oximeter.baseUrl=https://project.ccdev.org/
+
+# DHIS2 Credentials (Basic Auth)
+dhis2.oximeter.username=admin
+dhis2.oximeter.password=district
+
+# Data Element UIDs
+# SpO2 percentage
+dhis2.oximeter.spo2DataElement=gAFXupYQDOb
+# Heart Rate BPM
+dhis2.oximeter.heartRateDataElement=VqwQWWDmYLn

@@ -117,6 +117,11 @@
 
         <activity android:name=".usescases.reservedValue.ReservedValueActivity" />
         <activity
+            android:name=".sensors.oximeter.ui.OximeterActivity"
+            android:exported="false"
+            android:label="FORA O2 Oximeter"
+            android:theme="@style/AppTheme" />
+        <activity
             android:name=".usescases.eventsWithoutRegistration.eventCapture.EventCaptureActivity"
             android:configChanges="keyboardHidden|screenSize"
             android:windowSoftInputMode="adjustResize|stateAlwaysHidden" />

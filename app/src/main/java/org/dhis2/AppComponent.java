@@ -22,6 +22,8 @@ import org.dhis2.usescases.splash.SplashComponent;
 import org.dhis2.usescases.splash.SplashModule;
 import org.dhis2.utils.analytics.AnalyticsModule;
 import org.dhis2.utils.analytics.matomo.MatomoAnalyticsModule;
+import org.dhis2.sensors.oximeter.di.OximeterModule;
+import org.dhis2.sensors.oximeter.ui.OximeterActivity;
 import javax.inject.Singleton;
 
 import dagger.Component;
@@ -40,6 +42,7 @@ import dagger.Component;
         DispatcherModule.class,
         FeatureConfigModule.class,
         NetworkUtilsModule.class,
+        OximeterModule.class,
 })
 public  interface AppComponent {
 
@@ -86,6 +89,8 @@ public  interface AppComponent {
 
     //injection targets
     void inject(App app);
+    
+    void inject(OximeterActivity activity);
 
     //sub-components
     ServerComponent plus(ServerModule serverModule);
