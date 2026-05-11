@@ -23,8 +23,9 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.update
-import org.dhis2.form.ui.sensor.SensorConnectionManager
-import org.dhis2.form.ui.SensorType
+import org.dhis2.sensor.ble.BleManager
+import org.dhis2.sensor.ble.SensorType
+import org.dhis2.sensor.config.SensorConfigRepository
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.launch
 import org.dhis2.commons.date.DateUtils
@@ -58,8 +59,6 @@ import org.dhis2.form.ui.event.RecyclerViewUiEvents
 import org.dhis2.form.ui.idling.FormCountingIdlingResource
 import org.dhis2.form.ui.intent.FormIntent
 import org.dhis2.form.ui.provider.FormResultDialogProvider
-import org.dhis2.sensor.ble.BleManager
-import org.dhis2.sensor.config.SensorConfigRepository
 import org.dhis2.mobile.commons.model.CustomIntentRequestArgumentModel
 import org.dhis2.mobile.commons.providers.CustomIntentFailure
 import org.dhis2.mobile.commons.validation.validators.FieldMaskValidator
