@@ -47,16 +47,26 @@ class BleDeviceConnector(
     private var retryRunnable: Runnable? = null
     @Volatile private var spo2DataReceived = false
 
+    private val connectHandler = android.os.Handler(android.os.Looper.getMainLooper())
+    private var connectDevice: BluetoothDevice? = null
+    private var connectContext: Context? = null
+    private var connectRetries = 0
+    private val maxConnectRetries = 2
+
     fun connect(context: Context, device: BluetoothDevice, sensorType: SensorType) {
         currentSensorType = sensorType
+        connectDevice = device
+        connectContext = context
+        connectRetries = 0
         Log.d(TAG_CONNECT, "Connecting to ${device.address} (type=$sensorType)...")
-        // autoConnect=true: Android will connect as soon as the device is reachable,
-        // even if it powered off briefly. This avoids GATT_ERROR(133) race conditions
-        // where the device stops advertising before connectGatt() completes.
-        bluetoothGatt = device.connectGatt(context, true, gattCallback)
+        // autoConnect=false: direct connection — much faster than background autoConnect.
+        // If we get GATT_ERROR(133) we retry up to maxConnectRetries times with a short delay.
+        bluetoothGatt = device.connectGatt(context, false, gattCallback)
     }
 
     fun disconnect() {
+        connectHandler.removeCallbacksAndMessages(null)
+        connectRetries = 0
         bluetoothGatt?.disconnect()
         bluetoothGatt?.close()
         bluetoothGatt = null
@@ -66,13 +76,32 @@ class BleDeviceConnector(
     private val gattCallback = object : BluetoothGattCallback() {
 
         override fun onConnectionStateChange(gatt: BluetoothGatt, status: Int, newState: Int) {
-            when (newState) {
-                BluetoothProfile.STATE_CONNECTED -> {
+            when {
+                newState == BluetoothProfile.STATE_CONNECTED -> {
                     Log.d(TAG_CONNECT, "Connected to ${gatt.device.address}")
                     onConnectionStateChanged(true)
-                    gatt.discoverServices()
+                    // Small delay before discoverServices() — recommended by Android BLE docs
+                    // to let the connection stabilise before starting service discovery.
+                    connectHandler.postDelayed({ gatt.discoverServices() }, 300)
                 }
-                BluetoothProfile.STATE_DISCONNECTED -> {
+                newState == BluetoothProfile.STATE_DISCONNECTED && status == 133 -> {
+                    // GATT_ERROR 133 — device was found by scan but connection timed out.
+                    // Retry with a short delay (device may still be advertising).
+                    gatt.close()
+                    if (connectRetries < maxConnectRetries) {
+                        connectRetries++
+                        Log.w(TAG_CONNECT, "GATT error 133 — retry $connectRetries/$maxConnectRetries in 500ms")
+                        connectHandler.postDelayed({
+                            val ctx = connectContext ?: return@postDelayed
+                            val dev = connectDevice ?: return@postDelayed
+                            bluetoothGatt = dev.connectGatt(ctx, false, gattCallback)
+                        }, 500)
+                    } else {
+                        Log.e(TAG_CONNECT, "GATT error 133 — max retries reached, giving up")
+                        onConnectionStateChanged(false)
+                    }
+                }
+                newState == BluetoothProfile.STATE_DISCONNECTED -> {
                     Log.d(TAG_CONNECT, "Disconnected from ${gatt.device.address} (status=$status)")
                     onConnectionStateChanged(false)
                     gatt.close()
