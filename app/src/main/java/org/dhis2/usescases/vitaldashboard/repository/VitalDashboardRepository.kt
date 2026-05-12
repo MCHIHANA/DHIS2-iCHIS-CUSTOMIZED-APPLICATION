@@ -1,5 +1,8 @@
 package org.dhis2.usescases.vitaldashboard.repository
 
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.withContext
 import org.dhis2.commons.data.Dispatcher
 import org.dhis2.usescases.vitaldashboard.*
@@ -16,13 +19,14 @@ import kotlin.collections.HashMap
 /**
  * Repository for Vital Signs Dashboard
  * 
- * Fetches and processes vital signs data from DHIS2 SDK.
+ * Fetches and processes vital signs data from DHIS2 SDK with real-time monitoring capabilities.
  * Handles:
- * - Event data retrieval
+ * - Real-time event data retrieval
  * - Tracked entity data
  * - Data value aggregation
  * - Alert detection
  * - Trend calculation
+ * - Live dashboard updates
  * 
  * @property d2 DHIS2 SDK instance
  * @property dispatchers Coroutine dispatchers
@@ -35,6 +39,11 @@ class VitalDashboardRepository(
     private val dispatchers: Dispatcher,
     private val vitalSignConfig: VitalSignConfig
 ) {
+
+    companion object {
+        private const val REAL_TIME_REFRESH_INTERVAL_MS = 30000L // 30 seconds
+        private const val TAG = "VitalDashboardRepo"
+    }
 
     /**
      * Check if current user has authorization to access dashboard
@@ -63,41 +72,41 @@ class VitalDashboardRepository(
                 }
             }
 
-            Timber.d("User authorization check: $hasAuthorizedRole (roles: ${userRoles.map { it.name() }})")
+            Timber.tag(TAG).d("User authorization check: $hasAuthorizedRole (roles: ${userRoles.map { it.name() }})")
             hasAuthorizedRole
         } catch (e: Exception) {
-            Timber.e(e, "Error checking user authorization")
+            Timber.tag(TAG).e(e, "Error checking user authorization")
             false
         }
     }
 
     /**
-     * Get dashboard data with optional filtering
+     * Get dashboard data with optional filtering (one-time fetch)
      */
     suspend fun getDashboardData(filter: VitalDashboardFilter): VitalDashboardData = 
         withContext(dispatchers.io()) {
             try {
-                Timber.d("Loading dashboard data with filter: $filter")
+                Timber.tag(TAG).d("Loading dashboard data with filter: $filter")
 
                 // Fetch events containing vital signs data
                 val events = fetchVitalSignEvents(filter)
-                Timber.d("Fetched ${events.size} vital sign events")
+                Timber.tag(TAG).d("Fetched ${events.size} vital sign events")
 
                 // Fetch tracked entity instances (patients)
                 val patients = fetchPatients(events)
-                Timber.d("Fetched ${patients.size} patients")
+                Timber.tag(TAG).d("Fetched ${patients.size} patients")
 
                 // Process events into measurements
                 val measurements = processEventsToMeasurements(events, patients)
-                Timber.d("Processed ${measurements.size} measurements")
+                Timber.tag(TAG).d("Processed ${measurements.size} measurements")
 
                 // Generate patient summaries
                 val patientSummaries = generatePatientSummaries(measurements, patients)
-                Timber.d("Generated ${patientSummaries.size} patient summaries")
+                Timber.tag(TAG).d("Generated ${patientSummaries.size} patient summaries")
 
                 // Detect alerts
                 val alerts = detectAlerts(measurements)
-                Timber.d("Detected ${alerts.size} alerts")
+                Timber.tag(TAG).d("Detected ${alerts.size} alerts")
 
                 // Calculate statistics
                 val statistics = calculateStatistics(measurements, patients.size)
@@ -118,10 +127,106 @@ class VitalDashboardRepository(
                     trends = trends
                 )
             } catch (e: Exception) {
-                Timber.e(e, "Error loading dashboard data")
+                Timber.tag(TAG).e(e, "Error loading dashboard data")
                 throw e
             }
         }
+
+    /**
+     * Observe dashboard data in real-time with automatic refresh
+     * 
+     * This Flow emits updated dashboard data at regular intervals,
+     * allowing the UI to display live updates as new vital signs are captured.
+     * 
+     * @param filter Dashboard filter criteria
+     * @param refreshIntervalMs Refresh interval in milliseconds (default: 30 seconds)
+     * @return Flow of VitalDashboardData that updates automatically
+     */
+    fun observeDashboardData(
+        filter: VitalDashboardFilter,
+        refreshIntervalMs: Long = REAL_TIME_REFRESH_INTERVAL_MS
+    ): Flow<VitalDashboardData> = flow {
+        Timber.tag(TAG).d("Starting real-time dashboard observation (refresh every ${refreshIntervalMs}ms)")
+        
+        while (true) {
+            try {
+                val dashboardData = getDashboardData(filter)
+                emit(dashboardData)
+                Timber.tag(TAG).d("Emitted real-time dashboard update: ${dashboardData.patientSummaries.size} patients, ${dashboardData.alerts.size} alerts")
+                delay(refreshIntervalMs)
+            } catch (e: Exception) {
+                Timber.tag(TAG).e(e, "Error in real-time dashboard observation")
+                // Continue observing even if one fetch fails
+                delay(refreshIntervalMs)
+            }
+        }
+    }
+
+    /**
+     * Observe vital sign statistics in real-time
+     * 
+     * Provides a lightweight stream of statistics without full dashboard data.
+     * Useful for summary cards and quick metrics.
+     * 
+     * @param filter Dashboard filter criteria
+     * @param refreshIntervalMs Refresh interval in milliseconds
+     * @return Flow of VitalStatistics
+     */
+    fun observeStatistics(
+        filter: VitalDashboardFilter,
+        refreshIntervalMs: Long = REAL_TIME_REFRESH_INTERVAL_MS
+    ): Flow<VitalStatistics> = flow {
+        Timber.tag(TAG).d("Starting real-time statistics observation")
+        
+        while (true) {
+            try {
+                val events = fetchVitalSignEvents(filter)
+                val patients = fetchPatients(events)
+                val measurements = processEventsToMeasurements(events, patients)
+                val statistics = calculateStatistics(measurements, patients.size)
+                
+                emit(statistics)
+                Timber.tag(TAG).d("Emitted statistics update: ${statistics.totalPatients} patients, ${statistics.activeAlerts} alerts")
+                delay(refreshIntervalMs)
+            } catch (e: Exception) {
+                Timber.tag(TAG).e(e, "Error in real-time statistics observation")
+                delay(refreshIntervalMs)
+            }
+        }
+    }
+
+    /**
+     * Observe alerts in real-time
+     * 
+     * Monitors for new abnormal vital signs and emits alerts as they occur.
+     * Critical for clinical monitoring and immediate response.
+     * 
+     * @param filter Dashboard filter criteria
+     * @param refreshIntervalMs Refresh interval in milliseconds
+     * @return Flow of alert lists
+     */
+    fun observeAlerts(
+        filter: VitalDashboardFilter,
+        refreshIntervalMs: Long = REAL_TIME_REFRESH_INTERVAL_MS
+    ): Flow<List<VitalAlert>> = flow {
+        Timber.tag(TAG).d("Starting real-time alerts observation")
+        
+        while (true) {
+            try {
+                val events = fetchVitalSignEvents(filter)
+                val patients = fetchPatients(events)
+                val measurements = processEventsToMeasurements(events, patients)
+                val alerts = detectAlerts(measurements)
+                
+                emit(alerts)
+                Timber.tag(TAG).d("Emitted alerts update: ${alerts.size} alerts (${alerts.count { it.alertType == AlertType.CRITICAL_HIGH || it.alertType == AlertType.CRITICAL_LOW }} critical)")
+                delay(refreshIntervalMs)
+            } catch (e: Exception) {
+                Timber.tag(TAG).e(e, "Error in real-time alerts observation")
+                delay(refreshIntervalMs)
+            }
+        }
+    }
 
     /**
      * Fetch vital sign events from DHIS2

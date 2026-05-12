@@ -86,12 +86,15 @@ class VitalDashboardFragment : FragmentGlobalAbstract() {
 fun VitalDashboardScreen(viewModel: VitalDashboardViewModel) {
     val uiState by viewModel.uiState.collectAsState()
     val selectedTab by viewModel.selectedTab.collectAsState()
+    val realTimeEnabled by viewModel.realTimeEnabled.collectAsState()
 
     Scaffold(
         topBar = {
             VitalDashboardTopBar(
                 onRefresh = { viewModel.refreshData() },
-                onFilterClick = { viewModel.showFilterDialog() }
+                onFilterClick = { viewModel.showFilterDialog() },
+                realTimeEnabled = realTimeEnabled,
+                onRealTimeToggle = { viewModel.toggleRealTimeMonitoring() }
             )
         }
     ) { paddingValues ->
@@ -135,11 +138,29 @@ fun VitalDashboardScreen(viewModel: VitalDashboardViewModel) {
 @Composable
 fun VitalDashboardTopBar(
     onRefresh: () -> Unit,
-    onFilterClick: () -> Unit
+    onFilterClick: () -> Unit,
+    realTimeEnabled: Boolean = false,
+    onRealTimeToggle: () -> Unit = {}
 ) {
     TopAppBar(
         title = { Text("Vital Signs Dashboard") },
         actions = {
+            // Real-time monitoring toggle
+            IconButton(onClick = onRealTimeToggle) {
+                Icon(
+                    imageVector = if (realTimeEnabled) {
+                        androidx.compose.material.icons.Icons.Default.PlayArrow
+                    } else {
+                        androidx.compose.material.icons.Icons.Default.Pause
+                    },
+                    contentDescription = if (realTimeEnabled) "Disable Real-Time" else "Enable Real-Time",
+                    tint = if (realTimeEnabled) {
+                        MaterialTheme.colorScheme.primary
+                    } else {
+                        MaterialTheme.colorScheme.onSurface
+                    }
+                )
+            }
             IconButton(onClick = onFilterClick) {
                 Icon(
                     imageVector = androidx.compose.material.icons.Icons.Default.FilterList,
