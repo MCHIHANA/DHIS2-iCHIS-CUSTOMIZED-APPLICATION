@@ -581,6 +581,10 @@ class MainActivity :
                 mainNavigator.openQR()
             }
 
+            R.id.menu_vital_dashboard -> {
+                mainNavigator.openVitalDashboard()
+            }
+
             R.id.menu_about -> {
                 mainNavigator.openAbout()
             }

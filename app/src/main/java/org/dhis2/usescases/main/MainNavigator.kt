@@ -20,6 +20,7 @@ import org.dhis2.usescases.main.program.ProgramFragment
 import org.dhis2.usescases.qrReader.QrReaderFragment
 import org.dhis2.usescases.settings.SyncManagerFragment
 import org.dhis2.usescases.troubleshooting.TroubleshootingFragment
+import org.dhis2.usescases.vitaldashboard.VitalDashboardFragment
 
 class MainNavigator(
     private val dispatcherProvider: DispatcherProvider,
@@ -39,6 +40,7 @@ class MainNavigator(
         VISUALIZATIONS(R.string.done_task, R.id.menu_home),
         QR(R.string.QR_SCANNER, R.id.qr_scan),
         SETTINGS(R.string.SYNC_MANAGER, R.id.sync_manager),
+        VITAL_SIGNS_DASHBOARD(R.string.vital_signs_dashboard, R.id.menu_vital_dashboard),
         TROUBLESHOOTING(R.string.main_menu_troubleshooting, R.id.menu_troubleshooting),
         ABOUT(R.string.about, R.id.menu_about),
     }
@@ -94,6 +96,7 @@ class MainNavigator(
             MainScreen.VISUALIZATIONS -> openVisualizations()
             MainScreen.QR -> openQR()
             MainScreen.SETTINGS -> openSettings()
+            MainScreen.VITAL_SIGNS_DASHBOARD -> openVitalDashboard()
             MainScreen.ABOUT -> openAbout()
             MainScreen.TROUBLESHOOTING -> openTroubleShooting(languageSelectorOpened)
         }
@@ -129,6 +132,13 @@ class MainNavigator(
             fragment = TroubleshootingFragment.instance(languageSelectorOpened),
             screen = MainScreen.TROUBLESHOOTING,
             useFadeInTransition = languageSelectorOpened,
+        )
+    }
+
+    fun openVitalDashboard() {
+        beginTransaction(
+            VitalDashboardFragment.newInstance(),
+            MainScreen.VITAL_SIGNS_DASHBOARD,
         )
     }
 

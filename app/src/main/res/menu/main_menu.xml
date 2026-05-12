@@ -28,6 +28,10 @@
             android:visible="false"
             android:title="NFC Reader" />
         <item
+            android:id="@+id/menu_vital_dashboard"
+            android:icon="@drawable/ic_menu_vital_signs"
+            android:title="@string/vital_signs_dashboard" />
+        <item
             android:id="@+id/sync_manager"
             android:icon="@drawable/ic_menu_settings"
             android:title="@string/SYNC_MANAGER" />

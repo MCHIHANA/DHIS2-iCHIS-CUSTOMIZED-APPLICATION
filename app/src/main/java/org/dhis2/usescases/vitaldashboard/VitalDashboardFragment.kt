@@ -48,6 +48,15 @@ class VitalDashboardFragment : FragmentGlobalAbstract() {
 
     private val viewModel: VitalDashboardViewModel by viewModels { viewModelFactory }
 
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        
+        // Inject dependencies
+        (activity as? MainActivity)?.mainComponent
+            ?.plus(VitalDashboardModule())
+            ?.inject(this)
+    }
+
     override fun onCreateView(
         inflater: LayoutInflater,
         container: ViewGroup?,
