@@ -297,6 +297,25 @@ fun SensorButtonWrapper(
                     modifier = Modifier.padding(horizontal = Spacing.Spacing16, vertical = Spacing.Spacing4)
                 )
             }
+
+            val interpretation = org.dhis2.form.ui.sensor.MedicalInterpretationLayer.interpret(fieldUiModel.uid, fieldUiModel.label, fieldUiModel.value)
+            if (interpretation != null) {
+                org.dhis2.form.ui.sensor.MedicalInterpretationUI(
+                    interpretation = interpretation,
+                    modifier = Modifier.padding(horizontal = Spacing.Spacing16)
+                )
+            }
+        }
+    } else if (isSensorField) {
+        Column(modifier = Modifier.fillMaxWidth()) {
+            content()
+            val interpretation = org.dhis2.form.ui.sensor.MedicalInterpretationLayer.interpret(fieldUiModel.uid, fieldUiModel.label, fieldUiModel.value)
+            if (interpretation != null) {
+                org.dhis2.form.ui.sensor.MedicalInterpretationUI(
+                    interpretation = interpretation,
+                    modifier = Modifier.padding(start = Spacing.Spacing16, end = Spacing.Spacing16, bottom = Spacing.Spacing8)
+                )
+            }
         }
     } else {
         content()

@@ -9,6 +9,11 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Bluetooth
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+
 /**
  * Text button for sensor connection.
  * Replaces the icon with a "Connect Sensor" text button as requested by supervisor.
@@ -18,14 +23,14 @@ fun SensorConnectButton(
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    TextButton(
+    IconButton(
         onClick = onClick,
-        contentPadding = PaddingValues(horizontal = 8.dp),
         modifier = modifier
     ) {
-        Text(
-            text = "Connect Sensor",
-            style = MaterialTheme.typography.bodySmall
+        Icon(
+            imageVector = Icons.Filled.Bluetooth,
+            contentDescription = "Connect Sensor",
+            tint = MaterialTheme.colorScheme.primary
         )
     }
 }
@@ -41,6 +46,6 @@ fun InlineSensorConnectButton(
 ) {
     SensorConnectButton(
         onClick = onClick,
-        modifier = modifier.width(100.dp)
+        modifier = modifier
     )
 }
