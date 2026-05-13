@@ -43,8 +43,9 @@ class VitalDashboardRepository(
     suspend fun isUserAuthorized(): Boolean = withContext(dispatchers.io) {
         try {
             val user = d2.userModule().user().blockingGet()
+            val userRoleUids = user?.userRoles() ?: emptyList()
             val userRoles = d2.userModule().userRoles()
-                .byUid().`in`(UidsHelper.getUidsList(user?.userRoles()))
+                .byUid().`in`(UidsHelper.getUidsList(userRoleUids))
                 .blockingGet()
 
             val authorizedRoleNames = setOf(
