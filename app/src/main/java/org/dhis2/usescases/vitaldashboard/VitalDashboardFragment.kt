@@ -21,6 +21,7 @@ import androidx.fragment.app.viewModels
 import androidx.lifecycle.ViewModelProvider
 import org.dhis2.R
 import org.dhis2.usescases.general.FragmentGlobalAbstract
+import org.dhis2.usescases.main.MainActivity
 import org.dhis2.usescases.vitaldashboard.model.VitalSignType
 import org.dhis2.usescases.vitaldashboard.ui.*
 import org.hisp.dhis.mobile.ui.designsystem.theme.DHIS2Theme
