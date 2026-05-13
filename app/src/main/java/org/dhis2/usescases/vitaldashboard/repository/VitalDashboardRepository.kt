@@ -1,7 +1,7 @@
 package org.dhis2.usescases.vitaldashboard.repository
 
 import kotlinx.coroutines.withContext
-import org.dhis2.commons.data.Dispatcher
+import org.dhis2.mobile.commons.coroutine.Dispatcher
 import org.dhis2.usescases.vitaldashboard.*
 import org.dhis2.usescases.vitaldashboard.model.VitalSignType
 import org.hisp.dhis.android.core.D2

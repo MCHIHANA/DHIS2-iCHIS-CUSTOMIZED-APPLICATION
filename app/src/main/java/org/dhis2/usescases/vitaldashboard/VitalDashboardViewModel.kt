@@ -6,7 +6,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
-import org.dhis2.commons.data.Dispatcher
+import org.dhis2.mobile.commons.coroutine.Dispatcher
 import org.dhis2.usescases.vitaldashboard.model.VitalSignType
 import org.dhis2.usescases.vitaldashboard.repository.VitalDashboardRepository
 import timber.log.Timber
