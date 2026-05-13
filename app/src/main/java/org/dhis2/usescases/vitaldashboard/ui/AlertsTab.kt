@@ -3,6 +3,10 @@ package org.dhis2.usescases.vitaldashboard.ui
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -37,7 +41,7 @@ fun AlertsTabContent(
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 Icon(
-                    imageVector = androidx.compose.material.icons.Icons.Default.CheckCircle,
+                    imageVector = Icons.Filled.CheckCircle,
                     contentDescription = null,
                     tint = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.size(64.dp)
@@ -219,9 +223,9 @@ private fun getAlertIconColor(alertType: AlertType): androidx.compose.ui.graphic
 private fun getAlertIcon(alertType: AlertType): androidx.compose.ui.graphics.vector.ImageVector {
     return when (alertType) {
         AlertType.CRITICAL_HIGH, AlertType.CRITICAL_LOW -> 
-            androidx.compose.material.icons.Icons.Default.Warning
+            Icons.Filled.Warning
         else -> 
-            androidx.compose.material.icons.Icons.Default.Info
+            Icons.Filled.Info
     }
 }
 
