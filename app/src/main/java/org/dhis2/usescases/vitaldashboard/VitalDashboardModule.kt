@@ -2,7 +2,6 @@ package org.dhis2.usescases.vitaldashboard
 
 import dagger.Module
 import dagger.Provides
-import kotlinx.coroutines.Dispatchers
 import org.dhis2.commons.di.dagger.PerFragment
 import org.dhis2.mobile.commons.coroutine.Dispatcher
 import org.dhis2.usescases.vitaldashboard.repository.VitalDashboardRepository
@@ -18,16 +17,6 @@ import org.hisp.dhis.android.core.D2
  */
 @Module
 class VitalDashboardModule {
-
-    @Provides
-    @PerFragment
-    fun provideDispatcher(): Dispatcher {
-        return Dispatcher(
-            io = Dispatchers.IO,
-            main = Dispatchers.Main,
-            default = Dispatchers.Default
-        )
-    }
 
     @Provides
     @PerFragment
