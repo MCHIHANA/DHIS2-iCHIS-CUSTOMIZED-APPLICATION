@@ -40,7 +40,7 @@ class VitalDashboardRepository(
      * Check if current user has authorization to access dashboard
      * Restricted to: Doctors, Clinicians, Administrators
      */
-    suspend fun isUserAuthorized(): Boolean = withContext(dispatchers.io()) {
+    suspend fun isUserAuthorized(): Boolean = withContext(dispatchers.io) {
         try {
             val user = d2.userModule().user().blockingGet()
             val userRoles = d2.userModule().userRoles()
@@ -75,7 +75,7 @@ class VitalDashboardRepository(
      * Get dashboard data with optional filtering
      */
     suspend fun getDashboardData(filter: VitalDashboardFilter): VitalDashboardData = 
-        withContext(dispatchers.io()) {
+        withContext(dispatchers.io) {
             try {
                 Timber.d("Loading dashboard data with filter: $filter")
 

@@ -44,7 +44,7 @@ class VitalDashboardViewModel(
      * Check if current user is authorized to access the dashboard
      */
     private fun checkAuthorization() {
-        viewModelScope.launch(dispatchers.io()) {
+        viewModelScope.launch(dispatchers.io) {
             try {
                 val isAuthorized = repository.isUserAuthorized()
                 if (isAuthorized) {
@@ -64,7 +64,7 @@ class VitalDashboardViewModel(
      * Load dashboard data from repository
      */
     fun loadDashboardData() {
-        viewModelScope.launch(dispatchers.io()) {
+        viewModelScope.launch(dispatchers.io) {
             try {
                 _uiState.value = VitalDashboardUiState.Loading
                 
