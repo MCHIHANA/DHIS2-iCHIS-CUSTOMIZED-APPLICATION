@@ -5,22 +5,24 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.List
+import androidx.compose.material.icons.filled.Notifications
+import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.outlined.Info
+import androidx.compose.material.icons.outlined.Person
+import androidx.compose.material.icons.outlined.Warning
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
-import androidx.compose.runtime.livedata.observeAsState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.ComposeView
 import androidx.compose.ui.platform.ViewCompositionStrategy
-import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
-import androidx.fragment.app.Fragment
 import androidx.fragment.app.viewModels
-import androidx.lifecycle.ViewModelProvider
 import org.dhis2.R
 import org.dhis2.usescases.general.FragmentGlobalAbstract
+import org.dhis2.usescases.main.MainActivity
 import org.dhis2.usescases.vitaldashboard.model.VitalSignType
 import org.dhis2.usescases.vitaldashboard.ui.*
 import org.hisp.dhis.mobile.ui.designsystem.theme.DHIS2Theme
@@ -148,28 +150,24 @@ fun VitalDashboardTopBar(
             // Real-time monitoring toggle
             IconButton(onClick = onRealTimeToggle) {
                 Icon(
-                    imageVector = if (realTimeEnabled) {
-                        androidx.compose.material.icons.Icons.Default.PlayArrow
-                    } else {
-                        androidx.compose.material.icons.Icons.Default.Pause
-                    },
+                    imageVector = Icons.Filled.Notifications,
                     contentDescription = if (realTimeEnabled) "Disable Real-Time" else "Enable Real-Time",
                     tint = if (realTimeEnabled) {
-                        MaterialTheme.colorScheme.primary
+                        MaterialTheme.colorScheme.onPrimary
                     } else {
-                        MaterialTheme.colorScheme.onSurface
+                        MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.5f)
                     }
                 )
             }
             IconButton(onClick = onFilterClick) {
                 Icon(
-                    imageVector = androidx.compose.material.icons.Icons.Default.FilterList,
+                    imageVector = Icons.Filled.List,
                     contentDescription = "Filter"
                 )
             }
             IconButton(onClick = onRefresh) {
                 Icon(
-                    imageVector = androidx.compose.material.icons.Icons.Default.Refresh,
+                    imageVector = Icons.Filled.Search,
                     contentDescription = "Refresh"
                 )
             }
@@ -280,7 +278,7 @@ fun ErrorScreen(
             modifier = Modifier.padding(32.dp)
         ) {
             Icon(
-                imageVector = androidx.compose.material.icons.Icons.Default.Error,
+                imageVector = Icons.Outlined.Warning,
                 contentDescription = null,
                 tint = MaterialTheme.colorScheme.error,
                 modifier = Modifier.size(64.dp)
@@ -313,7 +311,7 @@ fun UnauthorizedScreen(modifier: Modifier = Modifier) {
             modifier = Modifier.padding(32.dp)
         ) {
             Icon(
-                imageVector = androidx.compose.material.icons.Icons.Default.Lock,
+                imageVector = Icons.Outlined.Person,
                 contentDescription = null,
                 tint = MaterialTheme.colorScheme.error,
                 modifier = Modifier.size(64.dp)
@@ -343,7 +341,7 @@ fun EmptyDashboardScreen(modifier: Modifier = Modifier) {
             modifier = Modifier.padding(32.dp)
         ) {
             Icon(
-                imageVector = androidx.compose.material.icons.Icons.Default.Inbox,
+                imageVector = Icons.Outlined.Info,
                 contentDescription = null,
                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.size(64.dp)

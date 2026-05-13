@@ -226,10 +226,6 @@ android {
     }
 
     ksp {
-        arg("room.schemaLocation", "$projectDir/schemas")
-        arg("room.incremental", "true")
-        arg("room.expandProjection", "true")
-        // Enable debug logs
         arg("ksp.logging.level", "DEBUG")
     }
 }

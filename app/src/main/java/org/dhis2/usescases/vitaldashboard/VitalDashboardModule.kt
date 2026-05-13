@@ -10,9 +10,11 @@ import org.hisp.dhis.android.core.D2
 
 /**
  * Dagger Module for Vital Signs Dashboard
- * 
- * Provides dependencies for the vital signs dashboard feature.
- * 
+ *
+ * Provides all dependencies for the vital signs dashboard feature.
+ * [Dispatcher] is constructed directly here because it is a plain data class
+ * with no @Inject constructor and is not bound anywhere else in the Dagger graph.
+ *
  * @author Shadreck Mkandawire
  */
 @Module
@@ -20,26 +22,24 @@ class VitalDashboardModule {
 
     @Provides
     @PerFragment
-    fun provideVitalSignConfig(): VitalSignConfig {
-        return VitalSignConfig()
-    }
+    fun provideDispatcher(): Dispatcher = Dispatcher()
+
+    @Provides
+    @PerFragment
+    fun provideVitalSignConfig(): VitalSignConfig = VitalSignConfig()
 
     @Provides
     @PerFragment
     fun provideVitalDashboardRepository(
         d2: D2,
-        dispatchers: Dispatcher,
-        vitalSignConfig: VitalSignConfig
-    ): VitalDashboardRepository {
-        return VitalDashboardRepository(d2, dispatchers, vitalSignConfig)
-    }
+        dispatcher: Dispatcher,
+        vitalSignConfig: VitalSignConfig,
+    ): VitalDashboardRepository = VitalDashboardRepository(d2, dispatcher, vitalSignConfig)
 
     @Provides
     @PerFragment
     fun provideVitalDashboardViewModelFactory(
         repository: VitalDashboardRepository,
-        dispatchers: Dispatcher
-    ): VitalDashboardViewModelFactory {
-        return VitalDashboardViewModelFactory(repository, dispatchers)
-    }
+        dispatcher: Dispatcher,
+    ): VitalDashboardViewModelFactory = VitalDashboardViewModelFactory(repository, dispatcher)
 }

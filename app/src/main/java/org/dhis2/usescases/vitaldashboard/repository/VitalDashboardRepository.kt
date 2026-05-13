@@ -4,17 +4,14 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.withContext
-import org.dhis2.commons.data.Dispatcher
+import org.dhis2.mobile.commons.coroutine.Dispatcher
 import org.dhis2.usescases.vitaldashboard.*
 import org.dhis2.usescases.vitaldashboard.model.VitalSignType
 import org.hisp.dhis.android.core.D2
-import org.hisp.dhis.android.core.arch.helpers.UidsHelper
-import org.hisp.dhis.android.core.common.State
 import org.hisp.dhis.android.core.event.Event
 import org.hisp.dhis.android.core.trackedentity.TrackedEntityInstance
 import timber.log.Timber
 import java.util.*
-import kotlin.collections.HashMap
 
 /**
  * Repository for Vital Signs Dashboard
@@ -49,11 +46,15 @@ class VitalDashboardRepository(
      * Check if current user has authorization to access dashboard
      * Restricted to: Doctors, Clinicians, Administrators
      */
-    suspend fun isUserAuthorized(): Boolean = withContext(dispatchers.io()) {
+    suspend fun isUserAuthorized(): Boolean = withContext(dispatchers.io) {
         try {
             val user = d2.userModule().user().blockingGet()
+            // Extract role UIDs directly to avoid UidsHelper type inference issues
+            val roleUids = user?.userRoles()?.mapNotNull { it.uid() } ?: emptyList()
+            if (roleUids.isEmpty()) return@withContext false
+
             val userRoles = d2.userModule().userRoles()
-                .byUid().`in`(UidsHelper.getUidsList(user?.userRoles()))
+                .byUid().`in`(roleUids)
                 .blockingGet()
 
             val authorizedRoleNames = setOf(
@@ -84,7 +85,7 @@ class VitalDashboardRepository(
      * Get dashboard data with optional filtering (one-time fetch)
      */
     suspend fun getDashboardData(filter: VitalDashboardFilter): VitalDashboardData = 
-        withContext(dispatchers.io()) {
+        withContext(dispatchers.io) {
             try {
                 Timber.tag(TAG).d("Loading dashboard data with filter: $filter")
 
@@ -234,7 +235,6 @@ class VitalDashboardRepository(
     private fun fetchVitalSignEvents(filter: VitalDashboardFilter): List<Event> {
         val eventQuery = d2.eventModule().events()
             .byDeleted().isFalse
-            .byState().notIn(State.TO_DELETE, State.ERROR)
 
         // Apply date filter
         filter.startDate?.let { start ->
@@ -256,20 +256,42 @@ class VitalDashboardRepository(
     }
 
     /**
-     * Fetch patient (tracked entity) data
+     * Fetch patient (tracked entity) data by resolving enrollment → TEI chain.
+     * Event.trackedEntityInstance() is package-private in this SDK version,
+     * so we go through the enrollment instead.
      */
     private fun fetchPatients(events: List<Event>): Map<String, TrackedEntityInstance> {
-        val teiUids = events.mapNotNull { it.trackedEntityInstance() }.distinct()
-        
-        if (teiUids.isEmpty()) {
-            return emptyMap()
-        }
+        val enrollmentUids = events.mapNotNull { it.enrollment() }.distinct()
+        if (enrollmentUids.isEmpty()) return emptyMap()
+
+        val teiUids = d2.enrollmentModule().enrollments()
+            .byUid().`in`(enrollmentUids)
+            .blockingGet()
+            .mapNotNull { it.trackedEntityInstance() }
+            .distinct()
+
+        if (teiUids.isEmpty()) return emptyMap()
 
         val teis = d2.trackedEntityModule().trackedEntityInstances()
             .byUid().`in`(teiUids)
             .blockingGet()
 
         return teis.associateBy { it.uid() }
+    }
+
+    /** Maps event UID → TEI UID via enrollment, cached for the current batch. */
+    private fun buildEventToTeiMap(events: List<Event>): Map<String, String> {
+        val enrollmentUids = events.mapNotNull { it.enrollment() }.distinct()
+        if (enrollmentUids.isEmpty()) return emptyMap()
+
+        return d2.enrollmentModule().enrollments()
+            .byUid().`in`(enrollmentUids)
+            .blockingGet()
+            .mapNotNull { enrollment ->
+                val teiUid = enrollment.trackedEntityInstance() ?: return@mapNotNull null
+                enrollment.uid() to teiUid
+            }
+            .toMap()
     }
 
     /**
@@ -280,9 +302,11 @@ class VitalDashboardRepository(
         patients: Map<String, TrackedEntityInstance>
     ): List<VitalMeasurement> {
         val measurements = mutableListOf<VitalMeasurement>()
+        val eventToTei = buildEventToTeiMap(events)
 
         events.forEach { event ->
-            val patientUid = event.trackedEntityInstance() ?: return@forEach
+            val enrollmentUid = event.enrollment() ?: return@forEach
+            val patientUid = eventToTei[enrollmentUid] ?: return@forEach
             val patient = patients[patientUid] ?: return@forEach
             val patientName = getPatientName(patient)
 

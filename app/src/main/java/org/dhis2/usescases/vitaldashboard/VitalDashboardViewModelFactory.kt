@@ -2,7 +2,7 @@ package org.dhis2.usescases.vitaldashboard
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
-import org.dhis2.commons.data.Dispatcher
+import org.dhis2.mobile.commons.coroutine.Dispatcher
 import org.dhis2.usescases.vitaldashboard.repository.VitalDashboardRepository
 
 /**

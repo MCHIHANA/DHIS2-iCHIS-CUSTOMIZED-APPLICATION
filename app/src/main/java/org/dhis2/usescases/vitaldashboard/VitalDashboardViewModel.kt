@@ -8,7 +8,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.launch
-import org.dhis2.commons.data.Dispatcher
+import org.dhis2.mobile.commons.coroutine.Dispatcher
 import org.dhis2.usescases.vitaldashboard.model.VitalSignType
 import org.dhis2.usescases.vitaldashboard.repository.VitalDashboardRepository
 import timber.log.Timber
@@ -61,7 +61,7 @@ class VitalDashboardViewModel(
      * Check if current user is authorized to access the dashboard
      */
     private fun checkAuthorization() {
-        viewModelScope.launch(dispatchers.io()) {
+        viewModelScope.launch(dispatchers.io) {
             try {
                 val isAuthorized = repository.isUserAuthorized()
                 if (isAuthorized) {
@@ -81,7 +81,7 @@ class VitalDashboardViewModel(
      * Load dashboard data from repository (one-time fetch)
      */
     fun loadDashboardData() {
-        viewModelScope.launch(dispatchers.io()) {
+        viewModelScope.launch(dispatchers.io) {
             try {
                 _uiState.value = VitalDashboardUiState.Loading
                 
@@ -119,7 +119,7 @@ class VitalDashboardViewModel(
         Timber.tag(TAG).i("Enabling real-time vital signs monitoring")
         _realTimeEnabled.value = true
 
-        realTimeObservationJob = viewModelScope.launch(dispatchers.io()) {
+        realTimeObservationJob = viewModelScope.launch(dispatchers.io) {
             repository.observeDashboardData(_filterState.value)
                 .catch { e ->
                     Timber.tag(TAG).e(e, "Error in real-time observation")
