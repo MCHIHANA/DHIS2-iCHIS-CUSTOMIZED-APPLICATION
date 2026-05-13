@@ -8,6 +8,8 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.*
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.livedata.observeAsState
 import androidx.compose.ui.Alignment
@@ -143,13 +145,13 @@ fun VitalDashboardTopBar(
         actions = {
             IconButton(onClick = onFilterClick) {
                 Icon(
-                    imageVector = androidx.compose.material.icons.Icons.Default.FilterList,
+                    imageVector = Icons.Default.FilterList,
                     contentDescription = "Filter"
                 )
             }
             IconButton(onClick = onRefresh) {
                 Icon(
-                    imageVector = androidx.compose.material.icons.Icons.Default.Refresh,
+                    imageVector = Icons.Default.Refresh,
                     contentDescription = "Refresh"
                 )
             }
@@ -260,7 +262,7 @@ fun ErrorScreen(
             modifier = Modifier.padding(32.dp)
         ) {
             Icon(
-                imageVector = androidx.compose.material.icons.Icons.Default.Error,
+                imageVector = Icons.Default.Error,
                 contentDescription = null,
                 tint = MaterialTheme.colorScheme.error,
                 modifier = Modifier.size(64.dp)
@@ -293,7 +295,7 @@ fun UnauthorizedScreen(modifier: Modifier = Modifier) {
             modifier = Modifier.padding(32.dp)
         ) {
             Icon(
-                imageVector = androidx.compose.material.icons.Icons.Default.Lock,
+                imageVector = Icons.Default.Lock,
                 contentDescription = null,
                 tint = MaterialTheme.colorScheme.error,
                 modifier = Modifier.size(64.dp)
@@ -323,7 +325,7 @@ fun EmptyDashboardScreen(modifier: Modifier = Modifier) {
             modifier = Modifier.padding(32.dp)
         ) {
             Icon(
-                imageVector = androidx.compose.material.icons.Icons.Default.Inbox,
+                imageVector = Icons.Default.Inbox,
                 contentDescription = null,
                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.size(64.dp)
