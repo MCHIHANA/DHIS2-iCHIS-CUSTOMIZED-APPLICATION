@@ -279,6 +279,7 @@ dependencies {
     implementation(libs.analytics.matomo)
     implementation(libs.analytics.rxlint)
     implementation(libs.analytics.customactivityoncrash)
+    implementation(libs.github.charts)
     implementation(libs.koin.core)
     implementation(libs.koin.android)
     implementation(libs.lottie.compose)

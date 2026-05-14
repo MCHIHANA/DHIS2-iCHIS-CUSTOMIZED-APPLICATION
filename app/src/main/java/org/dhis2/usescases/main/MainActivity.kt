@@ -581,6 +581,10 @@ class MainActivity :
                 mainNavigator.openQR()
             }
 
+            R.id.menu_vital_dashboard -> {
+                mainNavigator.openVitalDashboard()
+            }
+
             R.id.menu_about -> {
                 mainNavigator.openAbout()
             }
@@ -652,6 +656,10 @@ class MainActivity :
         val notificationManager: NotificationManager =
             getSystemService(NOTIFICATION_SERVICE) as NotificationManager
         notificationManager.cancelAll()
+    }
+
+    override fun setVitalDashboardVisibility(isVisible: Boolean) {
+        binding.navView.menu.findItem(R.id.menu_vital_dashboard)?.isVisible = isVisible
     }
 
     private fun showNewVersionAlert(version: String) {
