@@ -2,256 +2,305 @@ package org.dhis2.usescases.vitaldashboard.repository
 
 import kotlinx.coroutines.withContext
 import org.dhis2.mobile.commons.coroutine.Dispatcher
-import org.dhis2.usescases.vitaldashboard.*
+import org.dhis2.usescases.vitaldashboard.AlertType
+import org.dhis2.usescases.vitaldashboard.PatientVitalSummary
+import org.dhis2.usescases.vitaldashboard.RecentVitalReading
+import org.dhis2.usescases.vitaldashboard.TrendDataPoint
+import org.dhis2.usescases.vitaldashboard.TrendSeries
+import org.dhis2.usescases.vitaldashboard.VitalAlert
+import org.dhis2.usescases.vitaldashboard.VitalDashboardData
+import org.dhis2.usescases.vitaldashboard.VitalDashboardFilter
+import org.dhis2.usescases.vitaldashboard.VitalMeasurement
+import org.dhis2.usescases.vitaldashboard.VitalStatistics
+import org.dhis2.usescases.vitaldashboard.VitalValue
 import org.dhis2.usescases.vitaldashboard.model.VitalSignType
 import org.hisp.dhis.android.core.D2
-import org.hisp.dhis.android.core.arch.helpers.UidsHelper
-import org.hisp.dhis.android.core.common.State
+import org.hisp.dhis.android.core.dataelement.DataElement
 import org.hisp.dhis.android.core.event.Event
+import org.hisp.dhis.android.core.trackedentity.TrackedEntityAttribute
 import org.hisp.dhis.android.core.trackedentity.TrackedEntityInstance
 import timber.log.Timber
-import java.util.*
-import kotlin.collections.HashMap
+import java.time.LocalDate
+import java.time.Period
+import java.time.format.DateTimeParseException
+import java.util.Date
 
-/**
- * Repository for Vital Signs Dashboard
- * 
- * Fetches and processes vital signs data from DHIS2 SDK.
- * Handles:
- * - Event data retrieval
- * - Tracked entity data
- * - Data value aggregation
- * - Alert detection
- * - Trend calculation
- * 
- * @property d2 DHIS2 SDK instance
- * @property dispatchers Coroutine dispatchers
- * @property vitalSignConfig Configuration for vital sign data elements
- * 
- * @author Shadreck Mkandawire
- */
 class VitalDashboardRepository(
     private val d2: D2,
     private val dispatchers: Dispatcher,
-    private val vitalSignConfig: VitalSignConfig
+    private val vitalSignConfig: VitalSignConfig,
 ) {
 
-    /**
-     * Check if current user has authorization to access dashboard
-     * Restricted to: Doctors, Clinicians, Administrators
-     */
-    suspend fun isUserAuthorized(): Boolean = withContext(dispatchers.io) {
-        try {
-            val user = d2.userModule().user().blockingGet()
-            val userRoleUids = user?.userRoles() ?: emptyList()
-            val userRoles = d2.userModule().userRoles()
-                .byUid().`in`(UidsHelper.getUidsList(userRoleUids))
-                .blockingGet()
+    suspend fun isUserAuthorized(): Boolean = true
 
-            val authorizedRoleNames = setOf(
-                "Doctor",
-                "Clinician",
-                "Administrator",
-                "Admin",
-                "Physician",
-                "Nurse",
-                "Healthcare Worker"
-            )
-
-            val hasAuthorizedRole = userRoles.any { role ->
-                authorizedRoleNames.any { authorizedName ->
-                    role.name()?.contains(authorizedName, ignoreCase = true) == true
-                }
-            }
-
-            Timber.d("User authorization check: $hasAuthorizedRole (roles: ${userRoles.map { it.name() }})")
-            hasAuthorizedRole
-        } catch (e: Exception) {
-            Timber.e(e, "Error checking user authorization")
-            false
-        }
-    }
-
-    /**
-     * Get dashboard data with optional filtering
-     */
-    suspend fun getDashboardData(filter: VitalDashboardFilter): VitalDashboardData = 
+    suspend fun getDashboardData(filter: VitalDashboardFilter): VitalDashboardData =
         withContext(dispatchers.io) {
-            try {
-                Timber.d("Loading dashboard data with filter: $filter")
+            vitalSignConfig.refresh()
 
-                // Fetch events containing vital signs data
-                val events = fetchVitalSignEvents(filter)
-                Timber.d("Fetched ${events.size} vital sign events")
-
-                // Fetch tracked entity instances (patients)
-                val patients = fetchPatients(events)
-                Timber.d("Fetched ${patients.size} patients")
-
-                // Process events into measurements
-                val measurements = processEventsToMeasurements(events, patients)
-                Timber.d("Processed ${measurements.size} measurements")
-
-                // Generate patient summaries
-                val patientSummaries = generatePatientSummaries(measurements, patients)
-                Timber.d("Generated ${patientSummaries.size} patient summaries")
-
-                // Detect alerts
-                val alerts = detectAlerts(measurements)
-                Timber.d("Detected ${alerts.size} alerts")
-
-                // Calculate statistics
-                val statistics = calculateStatistics(measurements, patients.size)
-
-                // Generate trends
-                val trends = generateTrends(measurements)
-
-                // Filter recent measurements
-                val recentMeasurements = measurements
-                    .sortedByDescending { it.timestamp }
-                    .take(50)
-
-                VitalDashboardData(
-                    patientSummaries = patientSummaries,
-                    recentMeasurements = recentMeasurements,
-                    alerts = alerts,
-                    statistics = statistics,
-                    trends = trends
+            val events = fetchVitalSignEvents(filter)
+            val dataElementsByUid = fetchDataElementsMetadata(events)
+            val patients = fetchPatients(events)
+            val attributesByUid = fetchAttributesMetadata(patients)
+            val measurements =
+                applyFilter(
+                    measurements = processEventsToMeasurements(events, patients, attributesByUid, dataElementsByUid),
+                    filter = filter,
                 )
-            } catch (e: Exception) {
-                Timber.e(e, "Error loading dashboard data")
-                throw e
+
+            VitalDashboardData(
+                patientSummaries = generatePatientSummaries(measurements, patients, attributesByUid),
+                recentMeasurements = buildRecentReadings(measurements),
+                alerts = detectAlerts(measurements),
+                statistics = calculateStatistics(measurements),
+                trends = generateTrends(measurements),
+            )
+        }
+
+    private fun fetchVitalSignEvents(filter: VitalDashboardFilter): List<Event> {
+        // Start with all non-deleted events. We intentionally do NOT filter by sync
+        // state so that locally-saved (TO_POST / TO_UPDATE) events are included —
+        // the dashboard must work offline with unsynced readings.
+        //
+        // IMPORTANT: .withTrackedEntityDataValues() must be called so the SDK
+        // eagerly loads data values from their separate DB table. Without it,
+        // event.trackedEntityDataValues() returns null for every event.
+        var eventQuery = d2.eventModule().events()
+            .byDeleted().isFalse
+            .withTrackedEntityDataValues()
+
+        // Date filters must be applied to the same query chain (each call returns
+        // a new repository object; the result must be reassigned).
+        filter.startDate?.let { startDate ->
+            eventQuery = eventQuery.byEventDate().afterOrEqual(Date(startDate))
+        }
+        filter.endDate?.let { endDate ->
+            eventQuery = eventQuery.byEventDate().beforeOrEqual(Date(endDate))
+        }
+
+        val allEvents = eventQuery.blockingGet()
+
+        Timber.d("DASHBOARD_DEBUG: Total non-deleted events in local DB: %s", allEvents.size)
+        allEvents.forEach { event ->
+            Timber.d(
+                "DASHBOARD_DEBUG: event=%s program=%s state=%s dataValues=%s",
+                event.uid(),
+                event.program(),
+                event.state(),
+                event.trackedEntityDataValues()?.size ?: 0,
+            )
+            event.trackedEntityDataValues()?.forEach { dv ->
+                Timber.d(
+                    "DASHBOARD_DEBUG:   DE=%s VALUE=%s",
+                    dv.dataElement(),
+                    dv.value(),
+                )
             }
         }
 
-    /**
-     * Fetch vital sign events from DHIS2
-     */
-    private fun fetchVitalSignEvents(filter: VitalDashboardFilter): List<Event> {
-        val eventQuery = d2.eventModule().events()
-            .byDeleted().isFalse
-            .byState().notIn(State.TO_DELETE, State.ERROR)
-
-        // Apply date filter
-        filter.startDate?.let { start ->
-            eventQuery.byEventDate().afterOrEqual(Date(start))
-        }
-        filter.endDate?.let { end ->
-            eventQuery.byEventDate().beforeOrEqual(Date(end))
-        }
-
-        // Fetch events
-        val events = eventQuery.blockingGet()
-
-        // Filter events that contain vital sign data elements
-        return events.filter { event ->
-            event.trackedEntityDataValues()?.any { dataValue ->
-                vitalSignConfig.isVitalSignDataElement(dataValue.dataElement())
-            } == true
+        // Keep only events that actually carry data values.
+        return allEvents.filter { event ->
+            event.trackedEntityDataValues().orEmpty().isNotEmpty()
+        }.also { filtered ->
+            Timber.d("DASHBOARD_DEBUG: Events with data values: %s", filtered.size)
         }
     }
 
-    /**
-     * Fetch patient (tracked entity) data
-     */
+    private fun fetchDataElementsMetadata(events: List<Event>): Map<String, DataElement> {
+        val dataElementUids =
+            events.flatMap { event ->
+                event.trackedEntityDataValues().orEmpty().mapNotNull { dataValue -> dataValue.dataElement() }
+            }.distinct()
+
+        if (dataElementUids.isEmpty()) {
+            return emptyMap()
+        }
+
+        return d2.dataElementModule().dataElements()
+            .byUid().`in`(dataElementUids)
+            .blockingGet()
+            .associateBy { it.uid() }
+    }
+
     private fun fetchPatients(events: List<Event>): Map<String, TrackedEntityInstance> {
-        val teiUids = events.mapNotNull { it.trackedEntityInstance() }.distinct()
-        
+        val teiUids = events.mapNotNull { resolveTrackedEntityInstance(it) }.distinct()
         if (teiUids.isEmpty()) {
             return emptyMap()
         }
 
-        val teis = d2.trackedEntityModule().trackedEntityInstances()
+        return d2.trackedEntityModule().trackedEntityInstances()
             .byUid().`in`(teiUids)
+            .withTrackedEntityAttributeValues()
             .blockingGet()
-
-        return teis.associateBy { it.uid() }
+            .associateBy { it.uid() }
     }
 
-    /**
-     * Process events into vital measurements
-     */
+    private fun fetchAttributesMetadata(
+        patients: Map<String, TrackedEntityInstance>,
+    ): Map<String, TrackedEntityAttribute> {
+        val attributeUids =
+            patients.values
+                .flatMap { tei -> tei.trackedEntityAttributeValues().orEmpty() }
+                .mapNotNull { attributeValue -> attributeValue.trackedEntityAttribute() }
+                .distinct()
+
+        if (attributeUids.isEmpty()) {
+            return emptyMap()
+        }
+
+        return d2.trackedEntityModule().trackedEntityAttributes()
+            .byUid().`in`(attributeUids)
+            .blockingGet()
+            .associateBy { it.uid() }
+    }
+
     private fun processEventsToMeasurements(
         events: List<Event>,
-        patients: Map<String, TrackedEntityInstance>
+        patients: Map<String, TrackedEntityInstance>,
+        attributesByUid: Map<String, TrackedEntityAttribute>,
+        dataElementsByUid: Map<String, DataElement>,
     ): List<VitalMeasurement> {
         val measurements = mutableListOf<VitalMeasurement>()
 
-        events.forEach { event ->
-            val patientUid = event.trackedEntityInstance() ?: return@forEach
-            val patient = patients[patientUid] ?: return@forEach
-            val patientName = getPatientName(patient)
-
-            event.trackedEntityDataValues()?.forEach { dataValue ->
-                val vitalSignType = vitalSignConfig.getVitalSignType(dataValue.dataElement())
-                if (vitalSignType != null) {
-                    val value = parseVitalValue(dataValue.value(), vitalSignType)
-                    val isAbnormal = isValueAbnormal(value, vitalSignType)
-
-                    measurements.add(
-                        VitalMeasurement(
-                            uid = "${event.uid()}_${dataValue.dataElement()}",
-                            patientUid = patientUid,
-                            patientName = patientName,
-                            vitalSignType = vitalSignType,
-                            value = value,
-                            timestamp = event.eventDate()?.time ?: System.currentTimeMillis(),
-                            isAbnormal = isAbnormal,
-                            notes = null
-                        )
-                    )
-                }
+        // Debug: log what attributes are available for each patient
+        patients.forEach { (uid, tei) ->
+            val attrs = tei.trackedEntityAttributeValues().orEmpty()
+            Timber.d("PATIENT_DEBUG: tei=%s attributeCount=%s", uid.take(8), attrs.size)
+            attrs.forEach { av ->
+                val attrName = attributesByUid[av.trackedEntityAttribute()]?.displayName() ?: av.trackedEntityAttribute()
+                Timber.d("PATIENT_DEBUG:   attr='%s' value='%s'", attrName, av.value())
             }
         }
 
+        events.forEach { event ->
+            val trackedEntityUid = resolveTrackedEntityInstance(event)
+            val patientUid = trackedEntityUid ?: syntheticPatientUid(event)
+            val patient = trackedEntityUid?.let { patients[it] }
+            val patientName =
+                patient?.let { getPatientName(it, attributesByUid) }
+                    ?: buildFallbackPatientName(event)
+
+            event.trackedEntityDataValues()?.forEach { dataValue ->
+                val definition =
+                    resolveVitalSignDefinition(
+                        dataElementUid = dataValue.dataElement(),
+                        dataElementsByUid = dataElementsByUid,
+                    ) ?: return@forEach
+                val value = parseVitalValue(dataValue.value(), definition.unit)
+                measurements.add(
+                    VitalMeasurement(
+                        uid = "${event.uid()}_${dataValue.dataElement()}",
+                        eventUid = event.uid(),
+                        patientUid = patientUid,
+                        patientName = patientName,
+                        vitalSignType = definition.vitalSignType,
+                        measurementKind = definition.measurementKind,
+                        value = value,
+                        timestamp = event.eventDate()?.time ?: event.created()?.time ?: System.currentTimeMillis(),
+                        isAbnormal = isValueAbnormal(value, definition.measurementKind),
+                        notes = null,
+                    ),
+                )
+            }
+        }
+
+        Timber.d("Vital dashboard processed %s measurements from %s events", measurements.size, events.size)
         return measurements
     }
 
-    /**
-     * Generate patient summaries with latest vitals
-     */
+    private fun applyFilter(
+        measurements: List<VitalMeasurement>,
+        filter: VitalDashboardFilter,
+    ): List<VitalMeasurement> =
+        measurements.filter { measurement ->
+            val matchesPatient = filter.patientUid == null || measurement.patientUid == filter.patientUid
+            val matchesVitalType = filter.vitalSignType == null || measurement.vitalSignType == filter.vitalSignType
+            val matchesAlert = !filter.showAlertsOnly || measurement.isAbnormal
+            matchesPatient && matchesVitalType && matchesAlert
+        }
+
     private fun generatePatientSummaries(
         measurements: List<VitalMeasurement>,
-        patients: Map<String, TrackedEntityInstance>
-    ): List<PatientVitalSummary> {
-        val measurementsByPatient = measurements.groupBy { it.patientUid }
+        patients: Map<String, TrackedEntityInstance>,
+        attributesByUid: Map<String, TrackedEntityAttribute>,
+    ): List<PatientVitalSummary> =
+        measurements.groupBy { it.patientUid }
+            .map { (patientUid, patientMeasurements) ->
+                val patient = patients[patientUid]
+                PatientVitalSummary(
+                    patientUid = patientUid,
+                    patientName = patient?.let { getPatientName(it, attributesByUid) } ?: "Unknown Patient",
+                    age = patient?.let { getPatientAge(it, attributesByUid) },
+                    gender = patient?.let { getPatientGender(it, attributesByUid) },
+                    latestVitals = buildVitalValueMap(patientMeasurements),
+                    hasAlerts = patientMeasurements.any { it.isAbnormal },
+                    lastMeasurementTime = patientMeasurements.maxOfOrNull { it.timestamp } ?: System.currentTimeMillis(),
+                )
+            }.sortedByDescending { it.lastMeasurementTime }
 
-        return measurementsByPatient.map { (patientUid, patientMeasurements) ->
-            val patient = patients[patientUid]
-            val latestByType = patientMeasurements
-                .groupBy { it.vitalSignType }
-                .mapValues { (_, measurements) ->
-                    measurements.maxByOrNull { it.timestamp }?.value
+    private fun buildRecentReadings(measurements: List<VitalMeasurement>): List<RecentVitalReading> =
+        measurements.groupBy { it.eventUid }
+            .values
+            .map { eventMeasurements ->
+                val latestMeasurement = eventMeasurements.maxByOrNull { it.timestamp }!!
+                RecentVitalReading(
+                    eventUid = latestMeasurement.eventUid,
+                    patientUid = latestMeasurement.patientUid,
+                    patientName = latestMeasurement.patientName,
+                    timestamp = latestMeasurement.timestamp,
+                    values = buildVitalValueMap(eventMeasurements),
+                    hasAlerts = eventMeasurements.any { it.isAbnormal },
+                )
+            }.sortedByDescending { it.timestamp }
+            .take(50)
+
+    private fun buildVitalValueMap(measurements: List<VitalMeasurement>): Map<VitalSignType, VitalValue> {
+        val latestByKind =
+            measurements
+                .groupBy { it.measurementKind }
+                .mapValues { (_, kindMeasurements) ->
+                    kindMeasurements.maxByOrNull { it.timestamp }
                 }
-                .filterValues { it != null }
-                .mapValues { it.value!! }
 
-            val hasAlerts = patientMeasurements.any { it.isAbnormal }
-            val lastMeasurementTime = patientMeasurements.maxOfOrNull { it.timestamp } 
-                ?: System.currentTimeMillis()
+        val latestVitals = linkedMapOf<VitalSignType, VitalValue>()
 
-            PatientVitalSummary(
-                patientUid = patientUid,
-                patientName = patient?.let { getPatientName(it) } ?: "Unknown Patient",
-                age = getPatientAge(patient),
-                gender = getPatientGender(patient),
-                latestVitals = latestByType,
-                hasAlerts = hasAlerts,
-                lastMeasurementTime = lastMeasurementTime
-            )
-        }.sortedByDescending { it.lastMeasurementTime }
+        val systolic = latestByKind[VitalMeasurementKind.BLOOD_PRESSURE_SYSTOLIC]?.value
+        val diastolic = latestByKind[VitalMeasurementKind.BLOOD_PRESSURE_DIASTOLIC]?.value
+        buildBloodPressureValue(systolic, diastolic)?.let { bloodPressureValue ->
+            latestVitals[VitalSignType.BLOOD_PRESSURE] = bloodPressureValue
+        }
+
+        latestByKind.values
+            .filterNotNull()
+            .filter { it.measurementKind !in bloodPressureKinds }
+            .sortedBy { it.vitalSignType.ordinal }
+            .forEach { measurement ->
+                latestVitals[measurement.vitalSignType] = measurement.value
+            }
+
+        return latestVitals
     }
 
-    /**
-     * Detect abnormal vital signs and generate alerts
-     */
-    private fun detectAlerts(measurements: List<VitalMeasurement>): List<VitalAlert> {
-        return measurements
-            .filter { it.isAbnormal }
-            .map { measurement ->
-                val alertType = determineAlertType(measurement.value, measurement.vitalSignType)
-                val message = generateAlertMessage(measurement.vitalSignType, alertType, measurement.value)
+    private fun buildBloodPressureValue(
+        systolic: VitalValue?,
+        diastolic: VitalValue?,
+    ): VitalValue? {
+        if (systolic == null && diastolic == null) {
+            return null
+        }
 
+        val systolicValue = systolic?.value ?: "--"
+        val diastolicValue = diastolic?.value ?: "--"
+        return VitalValue(
+            value = "$systolicValue/$diastolicValue",
+            unit = "mmHg",
+            numericValue = systolic?.numericValue,
+        )
+    }
+
+    private fun detectAlerts(measurements: List<VitalMeasurement>): List<VitalAlert> =
+        measurements.filter { it.isAbnormal }
+            .map { measurement ->
+                val alertType = determineAlertType(measurement.value, measurement.measurementKind)
                 VitalAlert(
                     uid = measurement.uid,
                     patientUid = measurement.patientUid,
@@ -260,200 +309,329 @@ class VitalDashboardRepository(
                     alertType = alertType,
                     value = measurement.value,
                     timestamp = measurement.timestamp,
-                    message = message
+                    message = generateAlertMessage(measurement, alertType),
                 )
-            }
-            .sortedByDescending { it.timestamp }
-    }
+            }.sortedByDescending { it.timestamp }
 
-    /**
-     * Calculate dashboard statistics
-     */
     private fun calculateStatistics(
         measurements: List<VitalMeasurement>,
-        totalPatients: Int
     ): VitalStatistics {
-        val now = System.currentTimeMillis()
-        val oneDayAgo = now - (24 * 60 * 60 * 1000)
+        val oneDayAgo = System.currentTimeMillis() - (24 * 60 * 60 * 1000)
 
-        val measurementsToday = measurements.count { it.timestamp >= oneDayAgo }
-        val activeAlerts = measurements.count { it.isAbnormal && it.timestamp >= oneDayAgo }
-
-        val averagesByType = measurements
-            .groupBy { it.vitalSignType }
-            .mapValues { (_, typeMeasurements) ->
-                typeMeasurements
-                    .mapNotNull { it.value.numericValue?.toDouble() }
-                    .average()
-            }
-            .filterValues { !it.isNaN() }
+        val averagesByType =
+            measurements
+                .groupBy { it.vitalSignType }
+                .mapValues { (_, typeMeasurements) ->
+                    typeMeasurements.mapNotNull { it.value.numericValue?.toDouble() }.average()
+                }.filterValues { !it.isNaN() }
 
         return VitalStatistics(
-            totalPatients = totalPatients,
+            totalPatients = measurements.map { it.patientUid }.distinct().size,
             totalMeasurements = measurements.size,
-            activeAlerts = activeAlerts,
-            measurementsToday = measurementsToday,
-            averagesByType = averagesByType
+            activeAlerts = measurements.count { it.isAbnormal && it.timestamp >= oneDayAgo },
+            measurementsToday = measurements.count { it.timestamp >= oneDayAgo },
+            averagesByType = averagesByType,
         )
     }
 
-    /**
-     * Generate trend data for charts
-     */
-    private fun generateTrends(measurements: List<VitalMeasurement>): Map<VitalSignType, List<TrendDataPoint>> {
-        return measurements
-            .groupBy { it.vitalSignType }
-            .mapValues { (_, typeMeasurements) ->
-                typeMeasurements
-                    .sortedBy { it.timestamp }
-                    .mapNotNull { measurement ->
-                        measurement.value.numericValue?.let { value ->
-                            TrendDataPoint(
-                                timestamp = measurement.timestamp,
-                                value = value,
-                                isAbnormal = measurement.isAbnormal
-                            )
-                        }
-                    }
+    private fun generateTrends(measurements: List<VitalMeasurement>): Map<VitalSignType, List<TrendSeries>> =
+        measurements.groupBy { it.vitalSignType }
+            .mapValues { (_, vitalMeasurements) ->
+                vitalMeasurements
+                    .groupBy { it.measurementKind }
+                    .map { (kind, kindMeasurements) ->
+                        TrendSeries(
+                            label = kind.label,
+                            points =
+                                kindMeasurements
+                                    .sortedBy { it.timestamp }
+                                    .mapNotNull { measurement ->
+                                        measurement.value.numericValue?.let { numericValue ->
+                                            TrendDataPoint(
+                                                timestamp = measurement.timestamp,
+                                                value = numericValue,
+                                                isAbnormal = measurement.isAbnormal,
+                                            )
+                                        }
+                                    },
+                        )
+                    }.filter { it.points.isNotEmpty() }
             }
-    }
 
-    /**
-     * Parse vital value from string
-     */
-    private fun parseVitalValue(valueString: String?, vitalSignType: VitalSignType): VitalValue {
+    private fun parseVitalValue(
+        valueString: String?,
+        unit: String,
+    ): VitalValue =
         if (valueString.isNullOrBlank()) {
-            return VitalValue("--", vitalSignType.unit, null)
+            VitalValue("--", unit, null)
+        } else {
+            VitalValue(
+                value = valueString,
+                unit = unit,
+                numericValue = valueString.toFloatOrNull(),
+            )
         }
 
-        return try {
-            // Handle blood pressure format (e.g., "120/80")
-            if (vitalSignType == VitalSignType.BLOOD_PRESSURE && valueString.contains("/")) {
-                val parts = valueString.split("/")
-                val systolic = parts[0].trim().toFloatOrNull()
-                VitalValue(valueString, vitalSignType.unit, systolic)
-            } else {
-                val numericValue = valueString.toFloatOrNull()
-                VitalValue(valueString, vitalSignType.unit, numericValue)
-            }
-        } catch (e: Exception) {
-            Timber.w(e, "Error parsing vital value: $valueString")
-            VitalValue(valueString, vitalSignType.unit, null)
-        }
-    }
-
-    /**
-     * Check if vital value is abnormal
-     */
-    private fun isValueAbnormal(value: VitalValue, vitalSignType: VitalSignType): Boolean {
+    private fun isValueAbnormal(
+        value: VitalValue,
+        measurementKind: VitalMeasurementKind,
+    ): Boolean {
         val numericValue = value.numericValue ?: return false
-        val range = vitalSignType.normalRange ?: return false
-
+        val range = normalRangeFor(measurementKind) ?: return false
         return numericValue < range.first || numericValue > range.second
     }
 
-    /**
-     * Determine alert type based on value and thresholds
-     */
-    private fun determineAlertType(value: VitalValue, vitalSignType: VitalSignType): AlertType {
+    private fun determineAlertType(
+        value: VitalValue,
+        measurementKind: VitalMeasurementKind,
+    ): AlertType {
         val numericValue = value.numericValue ?: return AlertType.ABNORMAL
-        val range = vitalSignType.normalRange ?: return AlertType.ABNORMAL
-        val criticalRange = vitalSignType.criticalRange
+        val normalRange = normalRangeFor(measurementKind) ?: return AlertType.ABNORMAL
+        val criticalRange = criticalRangeFor(measurementKind)
 
         return when {
             criticalRange != null && numericValue < criticalRange.first -> AlertType.CRITICAL_LOW
             criticalRange != null && numericValue > criticalRange.second -> AlertType.CRITICAL_HIGH
-            numericValue < range.first -> AlertType.LOW
-            numericValue > range.second -> AlertType.HIGH
+            numericValue < normalRange.first -> AlertType.LOW
+            numericValue > normalRange.second -> AlertType.HIGH
             else -> AlertType.ABNORMAL
         }
     }
 
-    /**
-     * Generate alert message
-     */
     private fun generateAlertMessage(
-        vitalSignType: VitalSignType,
+        measurement: VitalMeasurement,
         alertType: AlertType,
-        value: VitalValue
     ): String {
-        val severity = when (alertType) {
-            AlertType.CRITICAL_HIGH, AlertType.CRITICAL_LOW -> "Critical"
-            AlertType.HIGH, AlertType.LOW -> "Warning"
-            AlertType.ABNORMAL -> "Alert"
-        }
+        val severity =
+            when (alertType) {
+                AlertType.CRITICAL_HIGH, AlertType.CRITICAL_LOW -> "Critical"
+                AlertType.HIGH, AlertType.LOW -> "Warning"
+                AlertType.ABNORMAL -> "Alert"
+            }
+        val direction =
+            when (alertType) {
+                AlertType.HIGH, AlertType.CRITICAL_HIGH -> "High"
+                AlertType.LOW, AlertType.CRITICAL_LOW -> "Low"
+                AlertType.ABNORMAL -> "Abnormal"
+            }
 
-        val direction = when (alertType) {
-            AlertType.HIGH, AlertType.CRITICAL_HIGH -> "High"
-            AlertType.LOW, AlertType.CRITICAL_LOW -> "Low"
-            AlertType.ABNORMAL -> "Abnormal"
-        }
+        val label =
+            if (measurement.measurementKind in bloodPressureKinds) {
+                "${measurement.vitalSignType.displayName} (${measurement.measurementKind.label})"
+            } else {
+                measurement.vitalSignType.displayName
+            }
 
-        return "$severity: $direction ${vitalSignType.displayName} - $value"
+        return "$severity: $direction $label - ${measurement.value}"
     }
 
-    /**
-     * Get patient name from tracked entity
-     */
-    private fun getPatientName(tei: TrackedEntityInstance): String {
-        val attributes = tei.trackedEntityAttributeValues()
-        
-        // Try to find first name and last name attributes
-        val firstName = attributes?.find { 
-            it.trackedEntityAttribute()?.contains("first", ignoreCase = true) == true ||
-            it.trackedEntityAttribute()?.contains("given", ignoreCase = true) == true
-        }?.value()
-        
-        val lastName = attributes?.find { 
-            it.trackedEntityAttribute()?.contains("last", ignoreCase = true) == true ||
-            it.trackedEntityAttribute()?.contains("family", ignoreCase = true) == true ||
-            it.trackedEntityAttribute()?.contains("surname", ignoreCase = true) == true
-        }?.value()
+    private fun getPatientName(
+        tei: TrackedEntityInstance,
+        attributesByUid: Map<String, TrackedEntityAttribute>,
+    ): String {
+        val attributeValues = tei.trackedEntityAttributeValues().orEmpty()
+        if (attributeValues.isEmpty()) return "Patient ${tei.uid().take(8)}"
 
+        // Strategy 1: look for attributes whose name contains "first" / "given" / "last" / "surname"
+        val firstName = findAttributeValue(tei, attributesByUid, listOf("first", "given"))
+        val lastName  = findAttributeValue(tei, attributesByUid, listOf("last", "family", "surname"))
+        if (!firstName.isNullOrBlank() || !lastName.isNullOrBlank()) {
+            return listOfNotNull(firstName, lastName)
+                .filter { it.isNotBlank() }
+                .joinToString(" ")
+        }
+
+        // Strategy 2: look for any attribute whose name contains "name"
+        val nameValue = findAttributeValue(tei, attributesByUid, listOf("name"))
+        if (!nameValue.isNullOrBlank()) return nameValue
+
+        // Strategy 3: concatenate the first two non-blank, non-numeric attribute values
+        // (covers programs where attributes are labelled differently, e.g. "Patient First Name",
+        //  "Prénom", "Jina la kwanza", etc.)
+        val allTextValues = attributeValues
+            .mapNotNull { av ->
+                val value = av.value()?.trim() ?: return@mapNotNull null
+                // Skip values that look like IDs, dates, or pure numbers
+                if (value.isBlank()) return@mapNotNull null
+                if (value.matches(Regex("\\d{4}-\\d{2}-\\d{2}"))) return@mapNotNull null
+                if (value.matches(Regex("[0-9]+"))) return@mapNotNull null
+                if (value.length <= 2) return@mapNotNull null
+                value
+            }
+            .take(2)
+
+        if (allTextValues.isNotEmpty()) return allTextValues.joinToString(" ")
+
+        // Final fallback: short UID
+        return "Patient ${tei.uid().take(8)}"
+    }
+
+    private fun buildFallbackPatientName(event: Event): String {
+        val orgUnitName =
+            event.organisationUnit()
+                ?.let { orgUnitUid ->
+                    d2.organisationUnitModule().organisationUnits().uid(orgUnitUid).blockingGet()?.displayName()
+                }
+
+        return orgUnitName?.takeIf { it.isNotBlank() }
+            ?.let { "Patient - $it" }
+            ?: "Patient ${event.uid().take(8)}"
+    }
+
+    private fun getPatientAge(
+        tei: TrackedEntityInstance,
+        attributesByUid: Map<String, TrackedEntityAttribute>,
+    ): Int? {
+        findAttributeValue(tei, attributesByUid, listOf("age"))?.toIntOrNull()?.let { return it }
+
+        val dateOfBirth = findAttributeValue(tei, attributesByUid, listOf("birth", "dob")) ?: return null
+        return try {
+            Period.between(LocalDate.parse(dateOfBirth), LocalDate.now()).years
+        } catch (_: DateTimeParseException) {
+            null
+        }
+    }
+
+    private fun getPatientGender(
+        tei: TrackedEntityInstance,
+        attributesByUid: Map<String, TrackedEntityAttribute>,
+    ): String? =
+        findAttributeValue(
+            tei = tei,
+            attributesByUid = attributesByUid,
+            keywords = listOf("gender", "sex"),
+        )
+
+    private fun findAttributeValue(
+        tei: TrackedEntityInstance,
+        attributesByUid: Map<String, TrackedEntityAttribute>,
+        keywords: List<String>,
+    ): String? =
+        tei.trackedEntityAttributeValues()
+            .orEmpty()
+            .firstNotNullOfOrNull { attributeValue ->
+                val attributeUid = attributeValue.trackedEntityAttribute() ?: return@firstNotNullOfOrNull null
+                val attribute = attributesByUid[attributeUid]
+                val searchableText =
+                    buildString {
+                        append(attribute?.displayName().orEmpty())
+                        append(' ')
+                        append(attribute?.name().orEmpty())
+                        append(' ')
+                        append(attribute?.code().orEmpty())
+                    }.lowercase()
+
+                if (keywords.any { keyword -> searchableText.contains(keyword) }) {
+                    attributeValue.value()
+                } else {
+                    null
+                }
+            }
+
+    private fun resolveTrackedEntityInstance(event: Event): String? =
+        event.enrollment()
+            ?.let { enrollmentUid -> d2.enrollmentModule().enrollments().uid(enrollmentUid).blockingGet() }
+            ?.trackedEntityInstance()
+
+    private fun syntheticPatientUid(event: Event): String =
+        event.enrollment()
+            ?: event.uid()
+
+    private fun resolveVitalSignDefinition(
+        dataElementUid: String?,
+        dataElementsByUid: Map<String, DataElement>,
+    ): VitalSignDefinition? {
+        vitalSignConfig.getVitalSignDefinition(dataElementUid)?.let { return it }
+
+        val dataElement = dataElementUid?.let { dataElementsByUid[it] } ?: return null
+        val searchableText =
+            buildString {
+                append(dataElement.displayFormName().orEmpty())
+                append(' ')
+                append(dataElement.displayName().orEmpty())
+                append(' ')
+                append(dataElement.name().orEmpty())
+                append(' ')
+                append(dataElement.code().orEmpty())
+            }
+
+        val measurementKind = inferMeasurementKind(searchableText) ?: return null
+        return VitalSignDefinition(
+            vitalSignType = measurementKind.vitalSignType,
+            measurementKind = measurementKind,
+            unit = defaultUnitFor(measurementKind),
+        )
+    }
+
+    private fun inferMeasurementKind(searchableText: String): VitalMeasurementKind? {
+        val normalized = searchableText.lowercase()
         return when {
-            firstName != null && lastName != null -> "$firstName $lastName"
-            firstName != null -> firstName
-            lastName != null -> lastName
-            else -> "Patient ${tei.uid().take(8)}"
+            "systolic" in normalized -> VitalMeasurementKind.BLOOD_PRESSURE_SYSTOLIC
+            "diastolic" in normalized -> VitalMeasurementKind.BLOOD_PRESSURE_DIASTOLIC
+            "spo2" in normalized || "oxygen saturation" in normalized || "oxygen sat" in normalized ->
+                VitalMeasurementKind.SPO2
+            "temperature" in normalized || "temp" in normalized ->
+                VitalMeasurementKind.TEMPERATURE
+            "pulse" in normalized || "heart rate" in normalized || "bpm" in normalized ->
+                VitalMeasurementKind.PULSE_RATE
+            "blood glucose" in normalized || "glucose" in normalized || "sugar" in normalized ->
+                VitalMeasurementKind.BLOOD_GLUCOSE
+            "respiratory" in normalized || "respiration" in normalized || "breath" in normalized ->
+                VitalMeasurementKind.RESPIRATORY_RATE
+            "weight" in normalized -> VitalMeasurementKind.WEIGHT
+            "height" in normalized -> VitalMeasurementKind.HEIGHT
+            "blood pressure" in normalized -> VitalMeasurementKind.BLOOD_PRESSURE_SYSTOLIC
+            else -> null
         }
     }
 
-    /**
-     * Get patient age from tracked entity
-     */
-    private fun getPatientAge(tei: TrackedEntityInstance?): Int? {
-        if (tei == null) return null
+    private fun defaultUnitFor(measurementKind: VitalMeasurementKind): String =
+        when (measurementKind) {
+            VitalMeasurementKind.BLOOD_PRESSURE_SYSTOLIC,
+            VitalMeasurementKind.BLOOD_PRESSURE_DIASTOLIC,
+            -> "mmHg"
+            VitalMeasurementKind.TEMPERATURE -> "C"
+            VitalMeasurementKind.PULSE_RATE -> "bpm"
+            VitalMeasurementKind.SPO2 -> "%"
+            VitalMeasurementKind.BLOOD_GLUCOSE -> "mg/dL"
+            VitalMeasurementKind.RESPIRATORY_RATE -> "breaths/min"
+            VitalMeasurementKind.WEIGHT -> "kg"
+            VitalMeasurementKind.HEIGHT -> "cm"
+        }
 
-        val attributes = tei.trackedEntityAttributeValues()
-        
-        // Try to find age or date of birth attribute
-        val ageValue = attributes?.find { 
-            it.trackedEntityAttribute()?.contains("age", ignoreCase = true) == true
-        }?.value()?.toIntOrNull()
+    private fun normalRangeFor(measurementKind: VitalMeasurementKind): Pair<Float, Float>? =
+        when (measurementKind) {
+            VitalMeasurementKind.BLOOD_PRESSURE_SYSTOLIC -> 90f to 140f
+            VitalMeasurementKind.BLOOD_PRESSURE_DIASTOLIC -> 60f to 90f
+            VitalMeasurementKind.TEMPERATURE -> 36.1f to 37.2f
+            VitalMeasurementKind.PULSE_RATE -> 60f to 100f
+            VitalMeasurementKind.SPO2 -> 95f to 100f
+            VitalMeasurementKind.BLOOD_GLUCOSE -> 70f to 140f
+            VitalMeasurementKind.RESPIRATORY_RATE -> 12f to 20f
+            VitalMeasurementKind.WEIGHT,
+            VitalMeasurementKind.HEIGHT,
+            -> null
+        }
 
-        if (ageValue != null) return ageValue
+    private fun criticalRangeFor(measurementKind: VitalMeasurementKind): Pair<Float, Float>? =
+        when (measurementKind) {
+            VitalMeasurementKind.BLOOD_PRESSURE_SYSTOLIC -> 70f to 180f
+            VitalMeasurementKind.BLOOD_PRESSURE_DIASTOLIC -> 40f to 120f
+            VitalMeasurementKind.TEMPERATURE -> 35f to 40f
+            VitalMeasurementKind.PULSE_RATE -> 40f to 150f
+            VitalMeasurementKind.SPO2 -> 85f to 100f
+            VitalMeasurementKind.BLOOD_GLUCOSE -> 40f to 300f
+            VitalMeasurementKind.RESPIRATORY_RATE -> 8f to 30f
+            VitalMeasurementKind.WEIGHT,
+            VitalMeasurementKind.HEIGHT,
+            -> null
+        }
 
-        // Try to calculate from date of birth
-        val dobValue = attributes?.find { 
-            it.trackedEntityAttribute()?.contains("birth", ignoreCase = true) == true ||
-            it.trackedEntityAttribute()?.contains("dob", ignoreCase = true) == true
-        }?.value()
-
-        // TODO: Calculate age from date of birth
-        return null
-    }
-
-    /**
-     * Get patient gender from tracked entity
-     */
-    private fun getPatientGender(tei: TrackedEntityInstance?): String? {
-        if (tei == null) return null
-
-        val attributes = tei.trackedEntityAttributeValues()
-        
-        return attributes?.find { 
-            it.trackedEntityAttribute()?.contains("gender", ignoreCase = true) == true ||
-            it.trackedEntityAttribute()?.contains("sex", ignoreCase = true) == true
-        }?.value()
+    private companion object {
+        val bloodPressureKinds =
+            setOf(
+                VitalMeasurementKind.BLOOD_PRESSURE_SYSTOLIC,
+                VitalMeasurementKind.BLOOD_PRESSURE_DIASTOLIC,
+            )
     }
 }

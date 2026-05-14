@@ -5,23 +5,16 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.runtime.*
-import androidx.compose.runtime.livedata.observeAsState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.ComposeView
 import androidx.compose.ui.platform.ViewCompositionStrategy
-import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
-import androidx.fragment.app.Fragment
 import androidx.fragment.app.viewModels
-import androidx.lifecycle.ViewModelProvider
-import org.dhis2.R
 import org.dhis2.usescases.general.FragmentGlobalAbstract
 import org.dhis2.usescases.main.MainActivity
 import org.dhis2.usescases.vitaldashboard.model.VitalSignType
@@ -53,8 +46,7 @@ class VitalDashboardFragment : FragmentGlobalAbstract() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        
-        // Inject dependencies
+
         (activity as? MainActivity)?.mainComponent
             ?.plus(VitalDashboardModule())
             ?.inject(this)
@@ -75,11 +67,6 @@ class VitalDashboardFragment : FragmentGlobalAbstract() {
         }
     }
 
-    override fun onResume() {
-        super.onResume()
-        viewModel.loadDashboardData()
-    }
-
     companion object {
         fun newInstance() = VitalDashboardFragment()
     }
@@ -94,7 +81,6 @@ fun VitalDashboardScreen(viewModel: VitalDashboardViewModel) {
         topBar = {
             VitalDashboardTopBar(
                 onRefresh = { viewModel.refreshData() },
-                onFilterClick = { viewModel.showFilterDialog() }
             )
         }
     ) { paddingValues ->
@@ -138,17 +124,10 @@ fun VitalDashboardScreen(viewModel: VitalDashboardViewModel) {
 @Composable
 fun VitalDashboardTopBar(
     onRefresh: () -> Unit,
-    onFilterClick: () -> Unit
 ) {
     TopAppBar(
         title = { Text("Vital Signs Dashboard") },
         actions = {
-            IconButton(onClick = onFilterClick) {
-                Icon(
-                    imageVector = Icons.Default.FilterList,
-                    contentDescription = "Filter"
-                )
-            }
             IconButton(onClick = onRefresh) {
                 Icon(
                     imageVector = Icons.Default.Refresh,
@@ -346,6 +325,6 @@ fun EmptyDashboardScreen(modifier: Modifier = Modifier) {
 enum class DashboardTab(val title: String) {
     OVERVIEW("Overview"),
     TRENDS("Trends"),
-    RECENT("Recent"),
+    RECENT("Recent Readings"),
     ALERTS("Alerts")
 }

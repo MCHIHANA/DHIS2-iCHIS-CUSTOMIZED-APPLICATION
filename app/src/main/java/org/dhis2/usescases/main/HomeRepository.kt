@@ -29,6 +29,8 @@ interface HomeRepository {
 
     suspend fun singleHomeItemData(): HomeItemData?
 
+    suspend fun hasVitalDashboardAccess(): Boolean
+
     suspend fun logOut(): Result<Unit>
 
     suspend fun clearSessionLock(): Result<Unit>

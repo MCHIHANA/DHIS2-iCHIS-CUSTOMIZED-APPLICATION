@@ -123,6 +123,8 @@ class HomeRepositoryImpl(
 
     override fun homeItemCount(): Int = d2.programs().size + d2.dataSetInstanceSummaries().size
 
+    override suspend fun hasVitalDashboardAccess(): Boolean = true
+
     override suspend fun singleHomeItemData(): HomeItemData? {
         val program = d2.programs().firstOrNull()
         val dataSetInstance = d2.dataSetInstanceSummaries().firstOrNull()

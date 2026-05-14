@@ -658,6 +658,10 @@ class MainActivity :
         notificationManager.cancelAll()
     }
 
+    override fun setVitalDashboardVisibility(isVisible: Boolean) {
+        binding.navView.menu.findItem(R.id.menu_vital_dashboard)?.isVisible = isVisible
+    }
+
     private fun showNewVersionAlert(version: String) {
         NewVersionDialog(
             newVersion = version,

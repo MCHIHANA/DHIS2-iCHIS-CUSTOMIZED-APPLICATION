@@ -139,6 +139,9 @@ class MainPresenter(
                     { Timber.e(it) },
                 ),
         )
+        launch(dispatcherProvider.ui()) {
+            view.setVitalDashboardVisibility(true)
+        }
         trackDhis2Server()
         fetchSensorConfig()
     }

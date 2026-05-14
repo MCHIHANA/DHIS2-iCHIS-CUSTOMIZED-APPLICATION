@@ -8,6 +8,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import org.dhis2.mobile.commons.coroutine.Dispatcher
 import org.dhis2.usescases.vitaldashboard.model.VitalSignType
+import org.dhis2.usescases.vitaldashboard.repository.VitalMeasurementKind
 import org.dhis2.usescases.vitaldashboard.repository.VitalDashboardRepository
 import timber.log.Timber
 
@@ -37,27 +38,7 @@ class VitalDashboardViewModel(
     val filterState: StateFlow<VitalDashboardFilter> = _filterState.asStateFlow()
 
     init {
-        checkAuthorization()
-    }
-
-    /**
-     * Check if current user is authorized to access the dashboard
-     */
-    private fun checkAuthorization() {
-        viewModelScope.launch(dispatchers.io) {
-            try {
-                val isAuthorized = repository.isUserAuthorized()
-                if (isAuthorized) {
-                    loadDashboardData()
-                } else {
-                    _uiState.value = VitalDashboardUiState.Unauthorized
-                    Timber.w("User not authorized to access Vital Signs Dashboard")
-                }
-            } catch (e: Exception) {
-                Timber.e(e, "Error checking authorization")
-                _uiState.value = VitalDashboardUiState.Error("Failed to verify access permissions")
-            }
-        }
+        loadDashboardData()
     }
 
     /**
@@ -191,10 +172,10 @@ sealed class VitalDashboardUiState {
  */
 data class VitalDashboardData(
     val patientSummaries: List<PatientVitalSummary>,
-    val recentMeasurements: List<VitalMeasurement>,
+    val recentMeasurements: List<RecentVitalReading>,
     val alerts: List<VitalAlert>,
     val statistics: VitalStatistics,
-    val trends: Map<VitalSignType, List<TrendDataPoint>>
+    val trends: Map<VitalSignType, List<TrendSeries>>
 ) {
     fun isEmpty(): Boolean = patientSummaries.isEmpty() && recentMeasurements.isEmpty()
 }
@@ -217,13 +198,24 @@ data class PatientVitalSummary(
  */
 data class VitalMeasurement(
     val uid: String,
+    val eventUid: String,
     val patientUid: String,
     val patientName: String,
     val vitalSignType: VitalSignType,
+    val measurementKind: VitalMeasurementKind,
     val value: VitalValue,
     val timestamp: Long,
     val isAbnormal: Boolean,
     val notes: String?
+)
+
+data class RecentVitalReading(
+    val eventUid: String,
+    val patientUid: String,
+    val patientName: String,
+    val timestamp: Long,
+    val values: Map<VitalSignType, VitalValue>,
+    val hasAlerts: Boolean,
 )
 
 /**
@@ -266,6 +258,11 @@ data class TrendDataPoint(
     val timestamp: Long,
     val value: Float,
     val isAbnormal: Boolean
+)
+
+data class TrendSeries(
+    val label: String,
+    val points: List<TrendDataPoint>,
 )
 
 /**

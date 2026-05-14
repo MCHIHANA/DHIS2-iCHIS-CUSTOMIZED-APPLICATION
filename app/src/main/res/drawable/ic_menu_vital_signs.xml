@@ -1,13 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Vital Signs Dashboard menu icon — a simple heart-rate / pulse waveform.
+    Drawn with plain vector paths; no external assets required.
+-->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="24dp"
     android:height="24dp"
     android:viewportWidth="24"
     android:viewportHeight="24">
+
+    <!-- Heart shape -->
     <path
-        android:fillColor="@color/text_black_333"
-        android:pathData="M16,6l2.29,2.29 -4.88,4.88 -4,-4L2,16.59 3.41,18l6,-6 4,4 6.3,-6.29L22,12V6z"/>
+        android:fillColor="@android:color/white"
+        android:pathData="M12,21.593c-5.63,-5.539 -11,-10.297 -11,-14.402
+                          C1,3.518 3.518,1 6.191,1
+                          C7.971,1 9.503,1.988 10.5,3.207
+                          C11.497,1.988 13.029,1 14.809,1
+                          C17.482,1 20,3.518 20,7.191
+                          C20,11.296 14.63,16.054 12,21.593Z" />
+
+    <!-- Pulse / ECG waveform line across the heart -->
     <path
-        android:fillColor="@color/text_black_333"
-        android:pathData="M12,2C6.48,2 2,6.48 2,12s4.48,10 10,10 10,-4.48 10,-10S17.52,2 12,2zM12,20c-4.41,0 -8,-3.59 -8,-8s3.59,-8 8,-8 8,3.59 8,8 -3.59,8 -8,8z"
-        android:fillAlpha="0.3"/>
+        android:strokeColor="#CC0000"
+        android:strokeWidth="1.4"
+        android:fillColor="@android:color/transparent"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:pathData="M2,12 L5,12 L6.5,9 L8,15 L9.5,10 L11,13 L12.5,11 L14,12 L22,12" />
+
 </vector>
