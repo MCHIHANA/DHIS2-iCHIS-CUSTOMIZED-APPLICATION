@@ -28,6 +28,7 @@ import org.dhis2.data.server.UserManager
 import org.dhis2.data.service.SyncStatusController
 import org.dhis2.data.service.VersionRepository
 import org.dhis2.data.service.workManager.WorkManagerController
+import org.dhis2.sensor.config.SensorConfigRepository
 import org.dhis2.usescases.login.SyncIsPerformedInteractor
 import org.dhis2.usescases.main.domain.LogoutUser
 import org.dhis2.usescases.settings.DeleteUserData
@@ -77,6 +78,7 @@ class MainPresenterTest {
     private val forceToNotSynced: Boolean = false
 
     private val logoutUser: LogoutUser = mock()
+    private val sensorConfigRepository: SensorConfigRepository = mock()
 
     @Rule
     @JvmField
@@ -104,6 +106,7 @@ class MainPresenterTest {
                 dispatcherProvider,
                 forceToNotSynced,
                 logoutUser,
+                sensorConfigRepository,
             )
     }
 
