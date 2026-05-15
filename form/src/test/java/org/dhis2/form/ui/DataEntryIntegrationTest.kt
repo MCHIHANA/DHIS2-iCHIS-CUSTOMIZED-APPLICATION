@@ -35,6 +35,8 @@ import org.dhis2.form.ui.provider.FormResultDialogProvider
 import org.dhis2.form.ui.provider.LegendValueProvider
 import org.dhis2.mobile.commons.model.MetadataIconData
 import org.dhis2.mobile.commons.providers.FieldErrorMessageProvider
+import org.dhis2.sensor.ble.BleManager
+import org.dhis2.sensor.config.SensorConfigRepository
 import org.dhis2.mobileProgramRules.RuleEngineHelper
 import org.hisp.dhis.android.core.common.ValueType
 import org.hisp.dhis.android.core.option.Option
@@ -59,6 +61,13 @@ class DataEntryIntegrationTest {
             on { io() } doReturn testingDispatcher
             on { ui() } doReturn testingDispatcher
         }
+    private val bleManager: BleManager =
+        mock {
+            on { devices } doReturn MutableStateFlow(emptyList())
+            on { sensorData } doReturn MutableStateFlow(emptyList())
+            on { connectionState } doReturn MutableStateFlow(BleManager.ConnectionState.DISCONNECTED)
+        }
+    private val sensorConfigRepository: SensorConfigRepository = mock()
     private val geometryController: GeometryController = mock()
     private val preferenceProvider: PreferenceProvider = mock()
 
@@ -161,6 +170,8 @@ class DataEntryIntegrationTest {
             FormViewModel(
                 repository = repository,
                 dispatcher = dispatcher,
+                bleManager = bleManager,
+                sensorConfigRepository = sensorConfigRepository,
                 geometryController = geometryController,
                 openErrorLocation = false,
                 resultDialogUiProvider = resultDialogUiProvider,

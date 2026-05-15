@@ -32,6 +32,8 @@ import org.dhis2.form.model.ValueStoreResult
 import org.dhis2.form.ui.FormViewModel
 import org.dhis2.form.ui.intent.FormIntent
 import org.dhis2.form.ui.provider.FormResultDialogProvider
+import org.dhis2.sensor.ble.BleManager
+import org.dhis2.sensor.config.SensorConfigRepository
 import org.dhis2.mobileProgramRules.RuleEngineHelper
 import org.hisp.dhis.android.core.D2
 import org.hisp.dhis.android.core.common.ValueType
@@ -57,6 +59,13 @@ class ProgramRulesTest {
     val rule = InstantTaskExecutorRule()
 
     private val d2: D2 = mock()
+    private val bleManager: BleManager =
+        mock {
+            on { devices } doReturn MutableStateFlow(emptyList())
+            on { sensorData } doReturn MutableStateFlow(emptyList())
+            on { connectionState } doReturn MutableStateFlow(BleManager.ConnectionState.DISCONNECTED)
+        }
+    private val sensorConfigRepository: SensorConfigRepository = mock()
     private val optionRepository: OptionsRepository = mock()
     private val formValueStore: FormValueStore = mock()
 
@@ -132,15 +141,17 @@ class ProgramRulesTest {
 
         formViewModel =
             FormViewModel(
-                repository,
-                object : DispatcherProvider {
+                repository = repository,
+                dispatcher = object : DispatcherProvider {
                     override fun io(): CoroutineDispatcher = testingDispatcher
 
                     override fun computation(): CoroutineDispatcher = testingDispatcher
 
                     override fun ui(): CoroutineDispatcher = testingDispatcher
                 },
-                geometryController,
+                bleManager = bleManager,
+                sensorConfigRepository = sensorConfigRepository,
+                geometryController = geometryController,
                 resultDialogUiProvider = resultDialogUiProvider,
             )
 

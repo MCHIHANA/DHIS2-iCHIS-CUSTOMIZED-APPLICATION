@@ -2,78 +2,68 @@ package org.dhis2.sensor.connection
 
 import android.bluetooth.BluetoothDevice
 import android.content.Context
-import android.os.Handler
-import android.os.Looper
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import org.dhis2.sensor.ble.BleDeviceConnector
-import org.dhis2.sensor.ble.BleScanner
-import org.dhis2.sensor.ble.KnownDevices
+import kotlinx.coroutines.flow.launchIn
+import kotlinx.coroutines.flow.onEach
+import org.dhis2.sensor.ble.BleManager
 import org.dhis2.sensor.ble.SensorType
 import org.dhis2.sensor.config.SensorConfigRepository
 
 class BleConnectionManager(
-    private val context: Context,
-    private val sensorConfigRepository: SensorConfigRepository,
+    context: Context,
+    sensorConfigRepository: SensorConfigRepository,
 ) {
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
+    private val bleManager = BleManager(context, sensorConfigRepository)
 
-    private val bleScanner = BleScanner(context)
-    private val mainHandler = Handler(Looper.getMainLooper())
+    val devices: StateFlow<List<BluetoothDevice>> = bleManager.devices
 
-    private val _devices = MutableStateFlow<List<BluetoothDevice>>(emptyList())
-    val devices: StateFlow<List<BluetoothDevice>> = _devices.asStateFlow()
-
-    private val _connectionState = MutableStateFlow<ConnectionState>(ConnectionState.DISCONNECTED)
+    private val _connectionState = MutableStateFlow(ConnectionState.DISCONNECTED)
     val connectionState: StateFlow<ConnectionState> = _connectionState.asStateFlow()
 
-    /** Multi-value readings: list of (key, value) pairs. */
-    private val _sensorData = MutableStateFlow<List<Pair<String, String>>>(emptyList())
-    val sensorData: StateFlow<List<Pair<String, String>>> = _sensorData.asStateFlow()
+    val sensorData: StateFlow<List<Pair<String, String>>> = bleManager.sensorData
 
-    private val bleDeviceConnector = BleDeviceConnector(
-        onConnectionStateChanged = { isConnected ->
-            _connectionState.value =
-                if (isConnected) ConnectionState.CONNECTED else ConnectionState.DISCONNECTED
-        },
-        onReadingsReceived = { readings ->
-            _sensorData.value = readings
-        },
-    )
+    init {
+        bleManager.connectionState
+            .onEach { state ->
+                _connectionState.value = when (state) {
+                    BleManager.ConnectionState.DISCONNECTED -> ConnectionState.DISCONNECTED
+                    BleManager.ConnectionState.CONNECTING -> ConnectionState.CONNECTING
+                    BleManager.ConnectionState.CONNECTED -> ConnectionState.CONNECTED
+                    BleManager.ConnectionState.DISCONNECTING -> ConnectionState.DISCONNECTING
+                }
+            }
+            .launchIn(scope)
+    }
 
     fun startScan() {
-        _devices.value = emptyList()
-        bleScanner.startScan(
-            onDeviceFound = { device ->
-                val currentList = _devices.value.toMutableList()
-                if (!currentList.contains(device)) {
-                    currentList.add(device)
-                    _devices.value = currentList
-                }
-            },
-            onTargetFound = { device ->
-                val sensorType = KnownDevices.typeFor(device.address)
-                // connectGatt must run on the main thread
-                mainHandler.post { connectDevice(device, sensorType) }
-            },
-        )
+        bleManager.startScan()
     }
 
     fun stopScan() {
-        bleScanner.stopScan()
+        bleManager.stopScan()
     }
 
-    fun connectDevice(device: BluetoothDevice, sensorType: SensorType = SensorType.UNKNOWN) {
-        stopScan()
-        _connectionState.value = ConnectionState.CONNECTING
-        bleDeviceConnector.connect(context, device, sensorType)
+    fun connectDevice(
+        device: BluetoothDevice,
+        sensorType: SensorType = SensorType.UNKNOWN,
+    ) {
+        bleManager.connectDevice(device, sensorType)
     }
 
     fun disconnect() {
-        bleDeviceConnector.disconnect()
+        bleManager.disconnect()
     }
 
     enum class ConnectionState {
-        DISCONNECTED, CONNECTING, CONNECTED, DISCONNECTING
+        DISCONNECTED,
+        CONNECTING,
+        CONNECTED,
+        DISCONNECTING,
     }
 }

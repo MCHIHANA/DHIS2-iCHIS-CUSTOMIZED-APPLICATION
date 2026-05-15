@@ -4,6 +4,7 @@ import android.content.Intent
 import androidx.arch.core.executor.testing.InstantTaskExecutorRule
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
@@ -18,6 +19,8 @@ import org.dhis2.form.ui.event.RecyclerViewUiEvents
 import org.dhis2.form.ui.intent.FormIntent
 import org.dhis2.form.ui.provider.FormResultDialogProvider
 import org.dhis2.mobile.commons.model.CustomIntentRequestArgumentModel
+import org.dhis2.sensor.ble.BleManager
+import org.dhis2.sensor.config.SensorConfigRepository
 import org.hisp.dhis.android.core.common.ValueType
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -43,6 +46,13 @@ class FormViewModelTest {
         mock {
             on { io() } doReturn testingDispatcher
         }
+    private val bleManager: BleManager =
+        mock {
+            on { devices } doReturn MutableStateFlow(emptyList())
+            on { sensorData } doReturn MutableStateFlow(emptyList())
+            on { connectionState } doReturn MutableStateFlow(BleManager.ConnectionState.DISCONNECTED)
+        }
+    private val sensorConfigRepository: SensorConfigRepository = mock()
     private val geometryController: GeometryController = mock()
     private val resultDialogUiProvider: FormResultDialogProvider = mock()
 
@@ -54,9 +64,11 @@ class FormViewModelTest {
 
         viewModel =
             FormViewModel(
-                repository,
-                dispatcher,
-                geometryController,
+                repository = repository,
+                dispatcher = dispatcher,
+                bleManager = bleManager,
+                sensorConfigRepository = sensorConfigRepository,
+                geometryController = geometryController,
                 resultDialogUiProvider = resultDialogUiProvider,
             )
         whenever(repository.getDateFormatConfiguration()) doReturn "ddMMyyyy"
