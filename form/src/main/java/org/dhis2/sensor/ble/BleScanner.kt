@@ -1,196 +1,24 @@
 package org.dhis2.sensor.ble
 
-import android.annotation.SuppressLint
-import android.bluetooth.BluetoothAdapter
 import android.bluetooth.BluetoothDevice
-import android.bluetooth.BluetoothManager
-import android.bluetooth.le.ScanCallback
-import android.bluetooth.le.ScanResult
-import android.bluetooth.le.ScanSettings
 import android.content.Context
-import android.util.Log
 
-private const val TAG = "BLE_SCAN"
+class BleScanner(context: Context) {
+    private val delegate = org.dhis2.sensors.core.BleScanner(context)
 
-/**
- * Health Thermometer service UUID — used for GATT verification after connection,
- * NOT as a scan filter (many devices don't include it in their advertisement packet).
- */
-private const val HEALTH_THERMOMETER_UUID = "00001809-0000-1000-8000-00805f9b34fb"
-
-/**
- * Nordic UART service UUID — used by FORA O2 oximeter
- */
-private const val NORDIC_UART_UUID = "00001523-1212-efde-1523-785feabcd123"
-
-/**
- * Blood Pressure service UUID (Bluetooth SIG standard)
- */
-private const val BLOOD_PRESSURE_UUID = "00001810-0000-1000-8000-00805f9b34fb"
-
-@SuppressLint("MissingPermission")
-class BleScanner(private val context: Context) {
-
-    private val bluetoothAdapter: BluetoothAdapter? by lazy {
-        val bluetoothManager =
-            context.getSystemService(Context.BLUETOOTH_SERVICE) as BluetoothManager
-        bluetoothManager.adapter
-    }
-
-    private val scanner by lazy { bluetoothAdapter?.bluetoothLeScanner }
-
-    private val seenDevices = mutableSetOf<String>() // MACs already reported
-    private var scanCallback: ScanCallback? = null
-
-    /**
-     * Starts a **continuous unfiltered** BLE scan using LOW_LATENCY mode.
-     *
-     * Why unfiltered: many BLE thermometers (including FORA IR42) do NOT include
-     * the Health Thermometer service UUID (0x1809) in their advertisement packet —
-     * they only expose it after a GATT connection. A service-UUID filter at the OS
-     * level would therefore never match them.
-     *
-     * Match logic (first match wins, scan stops):
-     *   1. Known MAC address in [KnownDevices.ALL]
-     *   2. Device name contains "FORA" (case-insensitive)
-     *   3. Device advertises service UUID 0x1809 in its scan record
-     *
-     * Every discovered device is also logged under BLE_DEVICE so you can see
-     * exactly what the thermometer is advertising when it powers on.
-     *
-     * [onDeviceFound] — called for every new device (device-list UI).
-     * [onTargetFound] — called once when a match is found; scan stops.
-     */
     fun startScan(
         onDeviceFound: (BluetoothDevice) -> Unit,
         onTargetFound: ((BluetoothDevice) -> Unit)? = null,
-        onAdvertisementTemperature: ((Double) -> Unit)? = null, // API compat
+        onAdvertisementTemperature: ((Double) -> Unit)? = null,
     ) {
-        if (scanCallback != null) {
-            Log.w(TAG, "Scan already in progress - stopping and restarting")
-            stopScan()
-        }
-        
-        if (bluetoothAdapter == null) {
-            Log.e(TAG, "Bluetooth adapter is null - cannot scan")
-            return
-        }
-        
-        if (scanner == null) {
-            Log.e(TAG, "BLE scanner is null - cannot scan")
-            return
-        }
-        
-        if (bluetoothAdapter?.isEnabled != true) {
-            Log.e(TAG, "Bluetooth is disabled - cannot scan")
-            return
-        }
-        
-        seenDevices.clear()
-
-        val settings = ScanSettings.Builder()
-            .setScanMode(ScanSettings.SCAN_MODE_LOW_LATENCY)
-            .build()
-
-        val callback = object : ScanCallback() {
-            override fun onScanResult(callbackType: Int, result: ScanResult) {
-                val device = result.device ?: return
-                val address = device.address
-                val name = device.name ?: ""
-
-                // Log every device once so we can see what the thermometer broadcasts
-                if (seenDevices.add(address)) {
-                    val serviceUuids = result.scanRecord?.serviceUuids
-                        ?.joinToString { it.uuid.toString() } ?: "none"
-                    Log.d(
-                        "BLE_DEVICE",
-                        "Found: name='$name' mac=$address services=[$serviceUuids]",
-                    )
-                    onDeviceFound(device)
-                }
-
-                // ── Match criteria ────────────────────────────────────────────
-
-                // 1. Known MAC
-                if (address in KnownDevices.ALL) {
-                    Log.d("BLE_MATCH", "Known MAC matched: $address")
-                    stopScan()
-                    onTargetFound?.invoke(device)
-                    return
-                }
-
-                // 2. FORA device name (including O2, IR42, etc.)
-                // Match: FORA, FORA02, FORA O2, O2, IR42, etc.
-                if (name.contains("FORA", ignoreCase = true) ||
-                    name.contains("O2", ignoreCase = false) ||
-                    name.contains("IR42", ignoreCase = true) ||
-                    name.matches(Regex(".*FORA.*", RegexOption.IGNORE_CASE)) ||
-                    name.matches(Regex(".*O2.*"))) {
-                    Log.d("BLE_MATCH", "FORA/O2 name matched: '$name' ($address)")
-                    stopScan()
-                    onTargetFound?.invoke(device)
-                    return
-                }
-
-                // 3. Health Thermometer service UUID in advertisement
-                val advertisedServices = result.scanRecord?.serviceUuids
-                if (advertisedServices != null) {
-                    if (advertisedServices.any {
-                        it.uuid.toString().equals(HEALTH_THERMOMETER_UUID, ignoreCase = true)
-                    }) {
-                        Log.d("BLE_MATCH", "Health Thermometer service UUID matched: $address")
-                        stopScan()
-                        onTargetFound?.invoke(device)
-                        return
-                    }
-                    
-                    // 4. Nordic UART service UUID (FORA O2 oximeter)
-                    if (advertisedServices.any {
-                        it.uuid.toString().equals(NORDIC_UART_UUID, ignoreCase = true)
-                    }) {
-                        Log.d("BLE_MATCH", "Nordic UART service UUID matched (likely FORA O2): $address")
-                        stopScan()
-                        onTargetFound?.invoke(device)
-                        return
-                    }
-                    
-                    // 5. Blood Pressure service UUID (0x1810)
-                    if (advertisedServices.any {
-                        it.uuid.toString().equals(BLOOD_PRESSURE_UUID, ignoreCase = true)
-                    }) {
-                        Log.d("BLE_MATCH", "Blood Pressure service UUID matched: $address")
-                        stopScan()
-                        onTargetFound?.invoke(device)
-                        return
-                    }
-                }
-            }
-
-            override fun onScanFailed(errorCode: Int) {
-                Log.e(TAG, "Scan failed — error code: $errorCode")
-            }
-        }
-
-        scanCallback = callback
-        // null filters = scan all devices; we do our own matching above
-        try {
-            scanner?.startScan(null, settings, callback)
-            Log.d(TAG, "Starting continuous unfiltered scan (LOW_LATENCY)...")
-        } catch (e: SecurityException) {
-            Log.e(TAG, "SecurityException starting scan - missing permissions?", e)
-            scanCallback = null
-        } catch (e: Exception) {
-            Log.e(TAG, "Exception starting scan", e)
-            scanCallback = null
-        }
+        delegate.startScan(
+            onDeviceFound = onDeviceFound,
+            onTargetFound = onTargetFound,
+            onAdvertisementTemperature = onAdvertisementTemperature,
+        )
     }
 
-    /** Stops the scan. Called after a match or manually on dismiss. */
     fun stopScan() {
-        scanCallback?.let {
-            scanner?.stopScan(it)
-            scanCallback = null
-            Log.d(TAG, "Scan stopped")
-        }
+        delegate.stopScan()
     }
 }
