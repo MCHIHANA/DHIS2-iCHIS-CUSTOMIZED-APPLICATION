@@ -1,4 +1,4 @@
-# 🚀 Quick Start: Build and Test BP Sensor
+#  Quick Start: Build and Test BP Sensor
 
 ## TL;DR
 
@@ -6,7 +6,7 @@ The "Unresolved reference 'completeEvent'" error is a **false positive** (IDE ca
 
 ---
 
-## ⚡ Fastest Path to Testing (5 minutes)
+##  Fastest Path to Testing (5 minutes)
 
 ### 1. Build APK
 ```cmd
@@ -28,11 +28,11 @@ adb shell pm clear org.dhis2.usescases.main
 1. Open app → Navigate to form with BP fields
 2. Tap any BP field → "Connect to Sensor"
 3. Take measurement on FORA D40b
-4. ✅ All 3 fields auto-populate
+4.  All 3 fields auto-populate
 
 ---
 
-## 🔍 Verify Logs
+##  Verify Logs
 ```cmd
 adb logcat | findstr "SENSOR_DATA"
 ```
@@ -48,7 +48,7 @@ SENSOR_DATA: Parsed BP: systolic=120.0, diastolic=80.0, pulse=72.0
 
 ---
 
-## 🛠️ Fix IDE Error (Optional)
+##  Fix IDE Error (Optional)
 
 If you want to continue using Android Studio:
 
@@ -61,20 +61,20 @@ Wait 5-10 minutes for re-indexing.
 
 ---
 
-## 📋 What's Implemented
+##  What's Implemented
 
-✅ BLE Blood Pressure Profile (0x1810) scanning  
-✅ FORA D40b connection (C0:26:DA:19:D4:FE)  
-✅ IEEE-11073 SFLOAT parsing  
-✅ Multi-measurement architecture  
-✅ Semantic key mapping (SYSTOLIC, DIASTOLIC, PULSE)  
-✅ Auto-fill 3 fields from 1 BLE notification  
-✅ Datastore configuration support  
-✅ Error handling and logging  
+ BLE Blood Pressure Profile (0x1810) scanning  
+ FORA D40b connection (C0:26:DA:19:D4:FE)  
+ IEEE-11073 SFLOAT parsing  
+ Multi-measurement architecture  
+ Semantic key mapping (SYSTOLIC, DIASTOLIC, PULSE)  
+ Auto-fill 3 fields from 1 BLE notification  
+ Datastore configuration support  
+ Error handling and logging  
 
 ---
 
-## 📚 Documentation
+##  Documentation
 
 | File | Purpose |
 |------|---------|
@@ -89,7 +89,7 @@ Wait 5-10 minutes for re-indexing.
 
 ---
 
-## ❓ Troubleshooting
+##  Troubleshooting
 
 ### Fields don't populate?
 
@@ -97,7 +97,7 @@ Wait 5-10 minutes for re-indexing.
    - This is REQUIRED to reload datastore config
    
 2. **Check Bluetooth permissions**
-   - Settings → Apps → DHIS2 → Permissions → Bluetooth ✅
+   - Settings → Apps → DHIS2 → Permissions → Bluetooth 
 
 3. **Check sensor battery**
    - Low battery = connection issues
@@ -122,7 +122,7 @@ Wait 5-10 minutes for re-indexing.
 
 ---
 
-## 🎯 Data Elements
+##  Data Elements
 
 Your DHIS2 form must have these data elements:
 
@@ -134,7 +134,7 @@ Your DHIS2 form must have these data elements:
 
 ---
 
-## 🔧 Sensor Details
+##  Sensor Details
 
 | Property | Value |
 |----------|-------|
@@ -147,7 +147,7 @@ Your DHIS2 form must have these data elements:
 
 ---
 
-## ✅ Verification Checklist
+##  Verification Checklist
 
 Before testing, verify:
 
@@ -161,7 +161,7 @@ Before testing, verify:
 
 ---
 
-## 🚨 Important Notes
+##  Important Notes
 
 1. **Always clear app data** after installing a new APK
    - The app caches datastore config
@@ -185,7 +185,7 @@ Before testing, verify:
 
 ---
 
-## 📞 Support
+##  Support
 
 If you encounter issues:
 
@@ -196,28 +196,28 @@ If you encounter issues:
 
 ---
 
-## 🎉 Success Criteria
+##  Success Criteria
 
 You'll know it's working when:
 
-1. ✅ App scans and finds FORA D40b
-2. ✅ Connection established (see "Connected" status)
-3. ✅ Take measurement on device
-4. ✅ All 3 fields populate instantly:
+1.  App scans and finds FORA D40b
+2.  Connection established (see "Connected" status)
+3.  Take measurement on device
+4.  All 3 fields populate instantly:
    - Systolic: e.g., 120 mmHg
    - Diastolic: e.g., 80 mmHg
    - Pulse: e.g., 72 bpm
-5. ✅ Logs show "Multi-measurement sensor detected"
-6. ✅ Logs show all 3 mappings (SYSTOLIC, DIASTOLIC, PULSE)
+5.  Logs show "Multi-measurement sensor detected"
+6.  Logs show all 3 mappings (SYSTOLIC, DIASTOLIC, PULSE)
 
 ---
 
-## 🏁 Ready to Test!
+##  Ready to Test!
 
 Your BP sensor implementation is **complete and working**. The IDE error is just a cache issue that doesn't affect functionality.
 
-**Run `build_apk.cmd` now and start testing!** 🚀
+**Run `build_apk.cmd` now and start testing!** 
 
 ---
 
-*Last updated: Based on verification run showing all checks passing ✅*
+*Last updated: Based on verification run showing all checks passing *

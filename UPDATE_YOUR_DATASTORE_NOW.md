@@ -1,4 +1,4 @@
-# ⚠️ UPDATE YOUR DATASTORE NOW
+#  UPDATE YOUR DATASTORE NOW
 
 ## Problem Found
 
@@ -6,9 +6,9 @@ Your current DataStore has **WRONG UIDs** for Diastolic and Pulse fields:
 
 | Field | Current (WRONG) | Should Be (CORRECT) |
 |-------|----------------|---------------------|
-| Systolic | `HkfzcXMdLLF` | `HkfzcXMdLLF` ✅ |
-| Diastolic | `skBarAsIYIL` ❌ | `BaGxiB8AsNI` ✅ |
-| Pulse | `tZbUrUbhUNy` ❌ | `S7OjKl85YSh` ✅ |
+| Systolic | `HkfzcXMdLLF` | `HkfzcXMdLLF`  |
+| Diastolic | `skBarAsIYIL`  | `BaGxiB8AsNI`  |
+| Pulse | `tZbUrUbhUNy`  | `S7OjKl85YSh`  |
 
 ## Quick Fix (2 Steps)
 
@@ -99,7 +99,7 @@ fetch('/api/dataStore/sensorConfig/config', {
   })
 })
 .then(r => r.json())
-.then(data => console.log('✓ Updated:', data))
+.then(data => console.log(' Updated:', data))
 .catch(e => console.error('Error:', e));
 ```
 
@@ -131,7 +131,7 @@ BP Sensor UIDs:
 2. **Open app** → Login → Settings → Sync metadata
 3. **Test BP sensor** → All 3 values should save correctly
 
-## ⚠️ IMPORTANT: Verify UIDs First!
+##  IMPORTANT: Verify UIDs First!
 
 Before updating DataStore, **verify your actual UIDs** in DHIS2:
 
@@ -153,14 +153,14 @@ In DHIS2 Maintenance → Data Elements:
 ## Why This Matters
 
 The app uses UIDs to save data, not names. If the DataStore has wrong UIDs:
-- ❌ BP sensor sends 3 values
-- ❌ App tries to save to wrong fields
-- ❌ Only 1 value gets saved (or none)
+-  BP sensor sends 3 values
+-  App tries to save to wrong fields
+-  Only 1 value gets saved (or none)
 
 With correct UIDs:
-- ✅ BP sensor sends 3 values
-- ✅ App maps to correct fields
-- ✅ All 3 values saved successfully
+-  BP sensor sends 3 values
+-  App maps to correct fields
+-  All 3 values saved successfully
 
 ---
 

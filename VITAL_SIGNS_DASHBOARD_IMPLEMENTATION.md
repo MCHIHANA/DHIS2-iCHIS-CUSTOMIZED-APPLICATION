@@ -29,35 +29,35 @@ This document provides a comprehensive guide for the Vital Signs Dashboard featu
 
 ### Core Functionality
 
-✅ **Patient Summary Cards**
+ **Patient Summary Cards**
 - Display latest vital signs for each patient
 - Show patient demographics (name, age, gender)
 - Highlight patients with abnormal readings
 - Display last measurement timestamp
 
-✅ **Recent Measurements Timeline**
+ **Recent Measurements Timeline**
 - Chronological list of all vital sign measurements
 - Filter by patient, vital sign type, or date range
 - Show measurement details and abnormal indicators
 
-✅ **Trend Visualizations**
+ **Trend Visualizations**
 - Line charts for vital sign trends over time
 - Support for multiple vital sign types
 - Highlight abnormal data points
 - Daily and weekly averages
 
-✅ **Medical Alerts System**
+ **Medical Alerts System**
 - Automatic detection of abnormal vital signs
 - Alert severity levels (Critical, High, Low, Abnormal)
 - Real-time alert notifications
 - Alert summary dashboard
 
-✅ **Offline-First Support**
+ **Offline-First Support**
 - Works with cached DHIS2 data
 - Automatic refresh after synchronization
 - No network required for viewing historical data
 
-✅ **Role-Based Access Control**
+ **Role-Based Access Control**
 - Restricted to: Doctors, Clinicians, Administrators
 - Unauthorized users see access denied screen
 - Automatic authorization check on dashboard load
@@ -191,7 +191,7 @@ DHIS2 Events → Process → Measurements → Aggregate → Dashboard Data
 "VqwQWWDmYLn" → SpO2
 ```
 
-**⚠️ Configuration Required:**
+** Configuration Required:**
 - Replace placeholder UIDs with actual data element UIDs from your DHIS2 instance
 - Can be loaded from DHIS2 datastore for dynamic configuration
 
@@ -563,12 +563,12 @@ https://github.com/MCHIHANA/DHIS2-iCHIS-CUSTOMIZED-APPLICATION/pull/new/feature/
 Implements a comprehensive Vital Signs Dashboard for authorized healthcare workers (Doctors, Clinicians, Administrators) to monitor patient vital signs in real-time.
 
 ## Features
-- ✅ Patient summary cards with latest vital signs
-- ✅ Recent measurements timeline
-- ✅ Trend visualizations with charts
-- ✅ Medical alerts system
-- ✅ Offline-first support
-- ✅ Role-based access control
+-  Patient summary cards with latest vital signs
+-  Recent measurements timeline
+-  Trend visualizations with charts
+-  Medical alerts system
+-  Offline-first support
+-  Role-based access control
 
 ## Architecture
 - MVVM pattern

@@ -5,17 +5,17 @@
 When connecting to the FORA D40b Blood Pressure sensor and taking a measurement, all three values (systolic, diastolic, pulse) were being received correctly by the app, but only the **diastolic field** was being populated, and it was receiving the **systolic value**.
 
 ### Symptoms
-- ✅ Sensor connects successfully
-- ✅ BLE packet received and parsed correctly
-- ✅ All 3 values extracted: Systolic=111, Diastolic=65, Pulse=75
-- ❌ Only diastolic field populated
-- ❌ Diastolic field shows systolic value (111 instead of 65)
-- ❌ Systolic field empty
-- ❌ Pulse field empty
+-  Sensor connects successfully
+-  BLE packet received and parsed correctly
+-  All 3 values extracted: Systolic=111, Diastolic=65, Pulse=75
+-  Only diastolic field populated
+-  Diastolic field shows systolic value (111 instead of 65)
+-  Systolic field empty
+-  Pulse field empty
 
 ### Log Evidence
 ```
-BLE_BP: ✓ Valid BP reading: 111/65 mmHg
+BLE_BP:  Valid BP reading: 111/65 mmHg
 BLE_BP:   Pulse: 75 bpm
 BleManager: Readings received from device: 3 values
 BleManager:   → SYSTOLIC = 111
@@ -150,9 +150,9 @@ SENSOR_SAVE: Saving PULSE=75 to field tZbUrUbhUNy
 ### UI Result
 ```
 ┌─────────────────────────────────────┐
-│ Systolic BP:    [111] mmHg          │  ✅ Correct value
-│ Diastolic BP:   [65]  mmHg          │  ✅ Correct value
-│ Pulse Rate:     [75]  bpm           │  ✅ Correct value
+│ Systolic BP:    [111] mmHg          │   Correct value
+│ Diastolic BP:   [65]  mmHg          │   Correct value
+│ Pulse Rate:     [75]  bpm           │   Correct value
 └─────────────────────────────────────┘
 ```
 
@@ -250,10 +250,10 @@ Legacy sensors (temperature, SpO2) still work with index-based mapping.
 ```
 
 ### Key Requirements
-- ✅ `type: "multi"` must be set
-- ✅ `measurements` map must exist
-- ✅ Measurement keys must match BLE semantic keys (lowercase)
-- ✅ Each measurement must have `dataElement` and `unit`
+-  `type: "multi"` must be set
+-  `measurements` map must exist
+-  Measurement keys must match BLE semantic keys (lowercase)
+-  Each measurement must have `dataElement` and `unit`
 
 ---
 
@@ -360,10 +360,10 @@ Always use the multi-measurement structure:
 
 ## Summary
 
-✅ **Problem**: Index-based mapping caused all BP values to go to one field  
-✅ **Solution**: Semantic key mapping using sensor configuration  
-✅ **Result**: All 3 BP values populate correct fields  
-✅ **Backward Compatible**: Legacy sensors still work  
-✅ **Scalable**: Easy to add more measurements  
+ **Problem**: Index-based mapping caused all BP values to go to one field  
+ **Solution**: Semantic key mapping using sensor configuration  
+ **Result**: All 3 BP values populate correct fields  
+ **Backward Compatible**: Legacy sensors still work  
+ **Scalable**: Easy to add more measurements  
 
-**Status**: ✅ Fixed and Committed
+**Status**:  Fixed and Committed

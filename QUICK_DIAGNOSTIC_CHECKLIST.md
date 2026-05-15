@@ -2,24 +2,24 @@
 
 ## Immediate Checks (Do These First!)
 
-### 1. Permissions ✓
+### 1. Permissions 
 - [ ] Open Settings → Apps → DHIS2 → Permissions
 - [ ] **Nearby devices** permission: GRANTED
 - [ ] **Location** permission: GRANTED
 - [ ] Location services: ON (Settings → Location)
 
-### 2. Bluetooth ✓
+### 2. Bluetooth 
 - [ ] Swipe down notification panel
 - [ ] Bluetooth icon is ON (blue/highlighted)
 - [ ] If off, tap to turn on
 
-### 3. Oximeter ✓
+### 3. Oximeter 
 - [ ] Press power button
 - [ ] Display lights up
 - [ ] Battery indicator shows charge
 - [ ] Device is NOT paired in Bluetooth settings (should be unpaired)
 
-### 4. Field Configuration ✓
+### 4. Field Configuration 
 Open the form and check:
 - [ ] SpO2 field has "Connect Sensor" button
 - [ ] Pulse field has "Connect Sensor" button
@@ -30,38 +30,38 @@ Open the form and check:
 When you tap "Connect Sensor", the dialog should show these messages in order:
 
 1. **"Initializing..."** (1 second)
-   - ✓ Normal - dialog just opened
+   -  Normal - dialog just opened
 
 2. **"Scanning for sensor..."** (2-10 seconds)
-   - ✓ Normal - looking for oximeter
-   - ❌ If stuck here > 15 seconds: Oximeter not advertising
+   -  Normal - looking for oximeter
+   -  If stuck here > 15 seconds: Oximeter not advertising
      - Turn oximeter off and on again
      - Check oximeter battery
      - Move phone closer to oximeter
 
 3. **"Found X device(s), searching..."** (appears if other BLE devices nearby)
-   - ✓ Normal - devices detected, still looking for oximeter
-   - ❌ If stuck here: Your oximeter doesn't match expected criteria
+   -  Normal - devices detected, still looking for oximeter
+   -  If stuck here: Your oximeter doesn't match expected criteria
      - Check MAC address (see below)
      - Check device name (see below)
 
 4. **"Connecting to sensor..."** (2-5 seconds)
-   - ✓ Normal - oximeter found, connecting
-   - ❌ If stuck here > 10 seconds: Connection failing
+   -  Normal - oximeter found, connecting
+   -  If stuck here > 10 seconds: Connection failing
      - Move phone closer
      - Restart oximeter
      - Restart Bluetooth on phone
 
 5. **"Connected - waiting for data..."** (5-15 seconds)
-   - ✓ Normal - connected, waiting for finger
+   -  Normal - connected, waiting for finger
    - **ACTION REQUIRED:** Place finger on sensor NOW
-   - ❌ If stuck here > 30 seconds: Sensor not sending data
+   -  If stuck here > 30 seconds: Sensor not sending data
      - Ensure finger is fully inserted
      - Keep finger still
      - Wait for LED to stop flashing
 
 6. **"Data received: XX"** (appears briefly)
-   - ✓ SUCCESS! Dialog will close automatically
+   -  SUCCESS! Dialog will close automatically
    - Both fields should be filled
 
 ## If Stuck at "Scanning for sensor..."
@@ -215,12 +215,12 @@ If none of the above works, collect this information:
 ## Success Indicators
 
 You'll know it's working when:
-- ✓ Dialog shows "Connecting..." within 10 seconds
-- ✓ Dialog shows "Connected - waiting for data..."
-- ✓ After placing finger, dialog shows "Data received: XX"
-- ✓ Both SpO2 and Pulse fields are filled
-- ✓ Dialog closes automatically
-- ✓ Values are reasonable (SpO2: 90-100%, Pulse: 50-120 bpm)
+-  Dialog shows "Connecting..." within 10 seconds
+-  Dialog shows "Connected - waiting for data..."
+-  After placing finger, dialog shows "Data received: XX"
+-  Both SpO2 and Pulse fields are filled
+-  Dialog closes automatically
+-  Values are reasonable (SpO2: 90-100%, Pulse: 50-120 bpm)
 
 ## Typical Timeline
 

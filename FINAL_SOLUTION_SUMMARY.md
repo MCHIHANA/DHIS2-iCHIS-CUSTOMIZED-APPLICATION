@@ -5,9 +5,9 @@ Oximeter sensor (FORA02) not connecting in DHIS2 app - dialog shows "Waiting for
 
 ## Root Cause Analysis
 Your device details from nRF Connect:
-- ✓ Device Name: FORA02
-- ✓ MAC Address: C0:26:DA:17:D5:7D (matches app config)
-- ✓ Can connect via nRF Connect (device hardware works)
+-  Device Name: FORA02
+-  MAC Address: C0:26:DA:17:D5:7D (matches app config)
+-  Can connect via nRF Connect (device hardware works)
 
 **Conclusion:** Device is fine. Problem is in the app - most likely **permissions**.
 
@@ -121,11 +121,11 @@ adb logcat -s BLE_SCAN:D BLE_DEVICE:D BLE_MATCH:D BLE_CONNECT:D FormViewModel:D
 ```
 
 Look for:
-- `BLE_SCAN: Starting continuous unfiltered scan` - Scan started ✓
-- `BLE_DEVICE: Found: name='FORA02'` - Device detected ✓
-- `BLE_MATCH: FORA/O2 name matched` - Device matched ✓
-- `BLE_CONNECT: Connecting to...` - Connection attempt ✓
-- `SecurityException` - PERMISSION DENIED ✗
+- `BLE_SCAN: Starting continuous unfiltered scan` - Scan started 
+- `BLE_DEVICE: Found: name='FORA02'` - Device detected 
+- `BLE_MATCH: FORA/O2 name matched` - Device matched 
+- `BLE_CONNECT: Connecting to...` - Connection attempt 
+- `SecurityException` - PERMISSION DENIED 
 
 ### If Shows "Found X device(s), searching..."
 
@@ -169,7 +169,7 @@ BLE_SERVICE: Services discovered (status=0) for SPO2
 BLE_SERVICE: Found FORA O2 characteristic: 00001524-1212-efde-1523-785feabcd123
 BLE_SERVICE: Sending trigger command (0x01) to FORA O2
 BLE_SPO2: FORA O2 raw (5B): 00 5F 48 00 00
-BLE_SPO2: ✓ Valid reading: SpO2=95% Pulse=72 bpm — emitting to ViewModel
+BLE_SPO2:  Valid reading: SpO2=95% Pulse=72 bpm — emitting to ViewModel
 BleManager: Readings received from device: 2 values
 BleManager:   → SPO2 = 95
 BleManager:   → PULSE = 72
@@ -180,12 +180,12 @@ SENSOR_SAVE: Saving PULSE=72 to field tZbUrUbhUNy
 
 ## Success Indicators
 
-✓ Dialog progresses through all status messages
-✓ Connection happens within 10 seconds
-✓ Data received within 15 seconds of placing finger
-✓ Both SpO2 and Pulse fields filled
-✓ Values are reasonable (SpO2: 90-100%, Pulse: 50-120 bpm)
-✓ Dialog closes automatically
+ Dialog progresses through all status messages
+ Connection happens within 10 seconds
+ Data received within 15 seconds of placing finger
+ Both SpO2 and Pulse fields filled
+ Values are reasonable (SpO2: 90-100%, Pulse: 50-120 bpm)
+ Dialog closes automatically
 
 ## Documentation Created
 
@@ -217,8 +217,8 @@ Android requires Location permission for BLE scanning. Without it, the scan will
 
 ## Build Status
 
-✓ Code compiles successfully
-✓ No errors
-✓ Ready to install and test
+ Code compiles successfully
+ No errors
+ Ready to install and test
 
 The app is now ready with comprehensive logging and error handling. The status messages will tell you exactly what's happening at each step!

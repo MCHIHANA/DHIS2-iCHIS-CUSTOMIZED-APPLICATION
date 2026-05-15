@@ -25,11 +25,11 @@ org.gradle.offline=true
 
 ## Important Notes
 
-⚠️ **Offline mode only works if you've built the project before**
+ **Offline mode only works if you've built the project before**
 - Gradle uses cached dependencies from previous builds
 - If this is your first build, you need internet access
 
-✅ **Your code changes are already committed and pushed**
+ **Your code changes are already committed and pushed**
 - The fix is on GitHub
 - You can build on another machine with internet access
 - Or wait until network connectivity is restored
@@ -79,7 +79,7 @@ If your main network is blocked:
 
 ## Summary
 
-**Your code is safe and pushed to GitHub!** ✅
+**Your code is safe and pushed to GitHub!** 
 
 The network issue is preventing the build, but your implementation is complete and committed. You can:
 - Try offline mode if you've built before

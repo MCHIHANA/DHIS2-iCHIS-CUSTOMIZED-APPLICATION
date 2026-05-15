@@ -2,12 +2,12 @@
 
 ## The Problem
 
-- ✓ Oximeter is ON
-- ✓ Finger is on sensor
-- ✓ Oximeter display shows SpO2 and Pulse values
-- ✓ App connects successfully
-- ✗ App shows "Connected - Place finger on sensor now!" forever
-- ✗ No data appears in the app
+-  Oximeter is ON
+-  Finger is on sensor
+-  Oximeter display shows SpO2 and Pulse values
+-  App connects successfully
+-  App shows "Connected - Place finger on sensor now!" forever
+-  No data appears in the app
 
 ## What This Means
 
@@ -32,10 +32,10 @@ BLE_SERVICE: Services discovered (status=0) for SPO2
 ### Subscription Flow
 ```
 BLE_SERVICE: *** subscribeForaO2 called ***
-BLE_SERVICE: ✓ Found Nordic service: 00001523-1212-efde-1523-785feabcd123
-BLE_SERVICE: ✓ Found FORA O2 characteristic: 00001524-1212-efde-1523-785feabcd123, properties=24
+BLE_SERVICE:  Found Nordic service: 00001523-1212-efde-1523-785feabcd123
+BLE_SERVICE:  Found FORA O2 characteristic: 00001524-1212-efde-1523-785feabcd123, properties=24
 BLE_SERVICE: setCharacteristicNotification result: true
-BLE_SERVICE: ✓ Found CCCD descriptor, writing ENABLE_NOTIFICATION_VALUE
+BLE_SERVICE:  Found CCCD descriptor, writing ENABLE_NOTIFICATION_VALUE
 BLE_SERVICE: writeDescriptor (legacy) result: true
 ```
 
@@ -43,7 +43,7 @@ BLE_SERVICE: writeDescriptor (legacy) result: true
 ```
 BLE_SERVICE: *** onDescriptorWrite: 00001524-1212-efde-1523-785feabcd123 status=0 ***
 BLE_SERVICE: Current sensor type: SPO2
-BLE_SERVICE: ✓ Descriptor write SUCCESS for 00001524-1212-efde-1523-785feabcd123
+BLE_SERVICE:  Descriptor write SUCCESS for 00001524-1212-efde-1523-785feabcd123
 BLE_SERVICE: *** Sending FORA O2 trigger command now ***
 BLE_SERVICE: Sending trigger command (0x01) to FORA O2 [WRITE_WITHOUT_RESPONSE]...
 BLE_SERVICE: Trigger command write (legacy, NO_RESPONSE) result: true
@@ -54,7 +54,7 @@ BLE_SERVICE: Trigger command write (legacy, NO_RESPONSE) result: true
 BLE_RAW: *** onCharacteristicChanged (legacy) *** [00001524-1212-EFDE-1523-785FEABCD123] 00 5F 48 00 00
 BLE_CALLBACK: onCharacteristicChanged (legacy) called for 00001524-1212-EFDE-1523-785FEABCD123, sensorType=SPO2
 BLE_SPO2: FORA O2 raw (5B): 00 5F 48 00 00
-BLE_SPO2: ✓ Valid reading: SpO2=95% Pulse=72 bpm — emitting to ViewModel
+BLE_SPO2:  Valid reading: SpO2=95% Pulse=72 bpm — emitting to ViewModel
 ```
 
 ## How to Capture Logs
@@ -93,7 +93,7 @@ adb logcat -s BLE_CONNECT:D BLE_SERVICE:D BLE_RAW:D BLE_SPO2:D BLE_CALLBACK:D Bl
 
 If you see:
 ```
-BLE_SERVICE: ✓ Descriptor write SUCCESS
+BLE_SERVICE:  Descriptor write SUCCESS
 BLE_SERVICE: *** Sending FORA O2 trigger command now ***
 BLE_SERVICE: Trigger command write result: true
 ```
@@ -208,20 +208,20 @@ BLE_CONNECT: Connecting to C0:26:DA:17:D5:7D (type=SPO2)...
 BLE_CONNECT: Connected to C0:26:DA:17:D5:7D
 BLE_SERVICE: Services discovered (status=0) for SPO2
 BLE_SERVICE: *** subscribeForaO2 called ***
-BLE_SERVICE: ✓ Found Nordic service: 00001523-1212-efde-1523-785feabcd123
-BLE_SERVICE: ✓ Found FORA O2 characteristic: 00001524-1212-efde-1523-785feabcd123
+BLE_SERVICE:  Found Nordic service: 00001523-1212-efde-1523-785feabcd123
+BLE_SERVICE:  Found FORA O2 characteristic: 00001524-1212-efde-1523-785feabcd123
 BLE_SERVICE: setCharacteristicNotification result: true
-BLE_SERVICE: ✓ Found CCCD descriptor, writing ENABLE_NOTIFICATION_VALUE
+BLE_SERVICE:  Found CCCD descriptor, writing ENABLE_NOTIFICATION_VALUE
 BLE_SERVICE: writeDescriptor (legacy) result: true
 BLE_SERVICE: *** onDescriptorWrite: 00001524-1212-efde-1523-785feabcd123 status=0 ***
-BLE_SERVICE: ✓ Descriptor write SUCCESS
+BLE_SERVICE:  Descriptor write SUCCESS
 BLE_SERVICE: *** Sending FORA O2 trigger command now ***
 BLE_SERVICE: Sending trigger command (0x01) to FORA O2 [WRITE_WITHOUT_RESPONSE]...
 BLE_SERVICE: Trigger command write (legacy, NO_RESPONSE) result: true
 [... wait 5-10 seconds with finger on sensor ...]
 BLE_RAW: *** onCharacteristicChanged (legacy) *** [00001524-1212-EFDE-1523-785FEABCD123] 00 5F 48 00 00
 BLE_SPO2: FORA O2 raw (5B): 00 5F 48 00 00
-BLE_SPO2: ✓ Valid reading: SpO2=95% Pulse=72 bpm — emitting to ViewModel
+BLE_SPO2:  Valid reading: SpO2=95% Pulse=72 bpm — emitting to ViewModel
 BleManager: Readings received from device: 2 values
 BleManager:   → SPO2 = 95
 BleManager:   → PULSE = 72

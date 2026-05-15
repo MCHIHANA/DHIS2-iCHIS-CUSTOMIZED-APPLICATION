@@ -1,13 +1,13 @@
 # Quick Fix Steps - Blood Pressure Field Mapping
 
-## ✅ Your Datastore Configuration is Correct!
+##  Your Datastore Configuration is Correct!
 
 Your configuration has:
-- ✅ `"type": "multi"`
-- ✅ `"measurements"` with systolic, diastolic, pulse
-- ✅ Correct data element UIDs
+-  `"type": "multi"`
+-  `"measurements"` with systolic, diastolic, pulse
+-  Correct data element UIDs
 
-## 🔧 Steps to Fix
+##  Steps to Fix
 
 ### Step 1: Clear App Data
 
@@ -68,14 +68,14 @@ SENSOR_SAVE: Saving PULSE=62 to field tZbUrUbhUNy
 
 All 3 fields should now be populated:
 ```
-Systolic BP:    [102] mmHg  ✅
-Diastolic BP:   [55]  mmHg  ✅
-Pulse Rate:     [62]  bpm   ✅
+Systolic BP:    [102] mmHg  
+Diastolic BP:   [55]  mmHg  
+Pulse Rate:     [62]  bpm   
 ```
 
 ---
 
-## 🐛 If It Still Doesn't Work
+##  If It Still Doesn't Work
 
 ### Check 1: Is the configuration loaded?
 
@@ -118,7 +118,7 @@ SENSOR_DATA: Mapping SYSTOLIC → HkfzcXMdLLF
 
 ---
 
-## 📝 Your Datastore Configuration (Verified Correct)
+##  Your Datastore Configuration (Verified Correct)
 
 ```json
 {
@@ -146,11 +146,11 @@ SENSOR_DATA: Mapping SYSTOLIC → HkfzcXMdLLF
 }
 ```
 
-✅ This configuration is **perfect**!
+ This configuration is **perfect**!
 
 ---
 
-## 🎯 Most Likely Issue
+##  Most Likely Issue
 
 The app is using **cached old configuration**. 
 
@@ -158,7 +158,7 @@ The app is using **cached old configuration**.
 
 ---
 
-## 💡 Quick Test Without Rebuilding
+##  Quick Test Without Rebuilding
 
 If you can't rebuild right now:
 
@@ -171,7 +171,7 @@ The latest code with debug logging is already on GitHub, so if you rebuild from 
 
 ---
 
-## 🚀 Expected Result
+##  Expected Result
 
 After clearing cache and testing:
 
@@ -185,11 +185,11 @@ SENSOR_DATA: Mapping PULSE → tZbUrUbhUNy
 
 **UI**:
 ```
-Systolic BP:    [102] mmHg  ✅
-Diastolic BP:   [55]  mmHg  ✅
-Pulse Rate:     [62]  bpm   ✅
+Systolic BP:    [102] mmHg  
+Diastolic BP:   [55]  mmHg  
+Pulse Rate:     [62]  bpm   
 ```
 
 ---
 
-**Your configuration is correct. Just need to clear the cache!** ✅
+**Your configuration is correct. Just need to clear the cache!** 

@@ -1,6 +1,6 @@
 # Blood Pressure Sensor - Quick Reference Guide
 
-## 🚀 Quick Start
+##  Quick Start
 
 ### For Developers
 
@@ -37,7 +37,7 @@ fun parseYourSensor(data: ByteArray): YourReading {
 
 ---
 
-## 📋 Blood Pressure Sensor Specs
+##  Blood Pressure Sensor Specs
 
 ### Device
 - **Model**: FORA D40b
@@ -56,7 +56,7 @@ fun parseYourSensor(data: ByteArray): YourReading {
 
 ---
 
-## 🔍 Key Files
+##  Key Files
 
 | File | Purpose |
 |------|---------|
@@ -70,7 +70,7 @@ fun parseYourSensor(data: ByteArray): YourReading {
 
 ---
 
-## 🐛 Debugging
+##  Debugging
 
 ### Essential Logcat Filters
 
@@ -103,7 +103,7 @@ adb logcat | grep "BLE_RAW"
 
 ---
 
-## 📊 Packet Examples
+##  Packet Examples
 
 ### Basic BP Reading (mmHg, no pulse)
 ```
@@ -140,7 +140,7 @@ Result: 120/82.5 mmHg (converted)
 
 ---
 
-## 🧮 IEEE-11073 SFLOAT
+##  IEEE-11073 SFLOAT
 
 ### Format
 ```
@@ -181,7 +181,7 @@ val value = mantissaSigned * Math.pow(10.0, exponentSigned.toDouble())
 
 ---
 
-## 🎯 Testing Checklist
+##  Testing Checklist
 
 ### Before Committing
 - [ ] Sensor discovered within 5s
@@ -205,7 +205,7 @@ val value = mantissaSigned * Math.pow(10.0, exponentSigned.toDouble())
 
 ---
 
-## 📝 Code Snippets
+##  Code Snippets
 
 ### Add New Sensor Type
 
@@ -345,7 +345,7 @@ private fun handleBloodPressureData(uuid: String, data: ByteArray) {
 
 ---
 
-## 🔗 Useful Links
+##  Useful Links
 
 ### Bluetooth SIG Specifications
 - [Blood Pressure Profile](https://www.bluetooth.com/specifications/specs/blood-pressure-profile-1-0/)
@@ -371,7 +371,7 @@ private fun handleBloodPressureData(uuid: String, data: ByteArray) {
 
 ---
 
-## 💡 Pro Tips
+##  Pro Tips
 
 ### Performance
 - Use `LOW_LATENCY` scan mode for fast discovery
@@ -405,7 +405,7 @@ private fun handleBloodPressureData(uuid: String, data: ByteArray) {
 
 ---
 
-## 🎓 Learning Resources
+##  Learning Resources
 
 ### Bluetooth Basics
 1. Read Bluetooth SIG profile specifications
@@ -427,7 +427,7 @@ private fun handleBloodPressureData(uuid: String, data: ByteArray) {
 
 ---
 
-## 📞 Support
+##  Support
 
 ### Issues
 - Check Logcat first
@@ -445,4 +445,4 @@ private fun handleBloodPressureData(uuid: String, data: ByteArray) {
 
 **Document Version**: 1.0  
 **Last Updated**: 2026-05-09  
-**Quick Reference**: Always keep this handy! 📌
+**Quick Reference**: Always keep this handy! 

@@ -1,27 +1,27 @@
-# 🔍 Debug: BP Sensor Only Saving One Value
+#  Debug: BP Sensor Only Saving One Value
 
-## ✅ What's Correct
+##  What's Correct
 
-1. **DataStore Configuration** ✅
-   - Namespace: `sensor-config` ✅
-   - Key: `vital-sensor-mapping` ✅
+1. **DataStore Configuration** 
+   - Namespace: `sensor-config` 
+   - Key: `vital-sensor-mapping` 
    - UIDs are correct:
-     - Systolic: `HkfzcXMdLLF` ✅
-     - Diastolic: `BaGxiB8AsNI` ✅
-     - Pulse: `S7OjKl85YSh` ✅
+     - Systolic: `HkfzcXMdLLF` 
+     - Diastolic: `BaGxiB8AsNI` 
+     - Pulse: `S7OjKl85YSh` 
 
-2. **App Code** ✅
-   - Looking for correct namespace/key ✅
-   - Multi-measurement mapping logic implemented ✅
+2. **App Code** 
+   - Looking for correct namespace/key 
+   - Multi-measurement mapping logic implemented 
 
-## ❌ The Problem
+##  The Problem
 
 **Only the field you tap first gets the systolic value.** This means:
 - The app is NOT loading the DataStore configuration
 - Falls back to legacy single-value mapping
 - Only saves to the "primary" field (whichever you tapped)
 
-## 🔍 Root Cause Analysis
+##  Root Cause Analysis
 
 The BP sensor sends data in this order:
 1. **SYSTOLIC** (first value, big font on device)
@@ -44,7 +44,7 @@ This means:
 - Index 1 (DIASTOLIC) → skipped (secondarySensorFieldUid is null)
 - Index 2 (PULSE) → skipped (else branch)
 
-## 🎯 Why DataStore Isn't Loading
+##  Why DataStore Isn't Loading
 
 ### Possible Reasons:
 
@@ -64,7 +64,7 @@ This means:
    - Old cached config might be interfering
    - SharedPreferences might have old data
 
-## 🛠️ Debugging Steps
+##  Debugging Steps
 
 ### Step 1: Check if DataStore is Being Fetched
 
@@ -99,9 +99,9 @@ When you connect the BP sensor, look for these logs (tag: "SENSOR_DATA"):
 **Expected (if DataStore loaded):**
 ```
 SENSOR_DATA: Received 3 readings for primary field: HkfzcXMdLLF
-SENSOR_DATA: Sensor config found: Blood Pressure ✅
-SENSOR_DATA: isMultiMeasurement: true ✅
-SENSOR_DATA: Multi-measurement sensor detected: Blood Pressure ✅
+SENSOR_DATA: Sensor config found: Blood Pressure 
+SENSOR_DATA: isMultiMeasurement: true 
+SENSOR_DATA: Multi-measurement sensor detected: Blood Pressure 
 SENSOR_DATA: Mapping SYSTOLIC → HkfzcXMdLLF
 SENSOR_DATA: Mapping DIASTOLIC → BaGxiB8AsNI
 SENSOR_DATA: Mapping PULSE → S7OjKl85YSh
@@ -110,9 +110,9 @@ SENSOR_DATA: Mapping PULSE → S7OjKl85YSh
 **Actual (if DataStore NOT loaded):**
 ```
 SENSOR_DATA: Received 3 readings for primary field: HkfzcXMdLLF
-SENSOR_DATA: Sensor config found: null ❌
-SENSOR_DATA: isMultiMeasurement: false ❌
-SENSOR_DATA: Using legacy index-based mapping ❌
+SENSOR_DATA: Sensor config found: null 
+SENSOR_DATA: isMultiMeasurement: false 
+SENSOR_DATA: Using legacy index-based mapping 
 SENSOR_DATA: Processing reading 0: key=SYSTOLIC, value=120, targetField=HkfzcXMdLLF
 ```
 
@@ -136,7 +136,7 @@ Verify `MainPresenter.fetchSensorConfig()` is being called:
 
 2. If you don't see it, the method might not be called on app start
 
-## 🚀 Quick Fix
+##  Quick Fix
 
 ### Option 1: Force Sync (Recommended)
 
@@ -155,7 +155,7 @@ Before clearing data, check the logs to understand what's happening:
 3. **Look for**: "Sensor config found: null" or "Sensor config found: Blood Pressure"
 4. **Share the logs** so we can see exactly what's happening
 
-## 📋 What to Check in Logs
+##  What to Check in Logs
 
 When you test the BP sensor, look for these specific log lines:
 
@@ -179,7 +179,7 @@ SENSOR_DATA: isMultiMeasurement: [true or false]
 - But mapping might still be failing
 - Share the full logs
 
-## 🎯 Expected Behavior After Fix
+##  Expected Behavior After Fix
 
 When DataStore is loaded correctly:
 
@@ -192,7 +192,7 @@ When DataStore is loaded correctly:
 
 You should NOT need to tap each field individually!
 
-## 📝 Next Steps
+##  Next Steps
 
 1. **Clear app data** and **sync metadata**
 2. **Test BP sensor** and check logs

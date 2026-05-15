@@ -32,11 +32,11 @@
    - Both SpO2 and Pulse fields populated with values
 
 ### Expected Results
-- ✅ SpO2 field shows value between 50-100%
-- ✅ Pulse field shows value between 20-300 bpm
-- ✅ Both fields populated from single sensor connection
-- ✅ Dialog dismisses automatically
-- ✅ No error messages
+-  SpO2 field shows value between 50-100%
+-  Pulse field shows value between 20-300 bpm
+-  Both fields populated from single sensor connection
+-  Dialog dismisses automatically
+-  No error messages
 
 ### Troubleshooting
 
@@ -118,7 +118,7 @@ BLE_SERVICE: Sending trigger command (0x01) to FORA O2 [WRITE_WITHOUT_RESPONSE].
 BLE_RAW: [00001524-1212-EFDE-1523-785FEABCD123] 00 5F 48 00 00
 BLE_SPO2: FORA O2 raw (5B): 00 5F 48 00 00
 BLE_SPO2: First data packet received — cancelling retry timer
-BLE_SPO2: ✓ Valid reading: SpO2=95% Pulse=72 bpm — emitting to ViewModel
+BLE_SPO2:  Valid reading: SpO2=95% Pulse=72 bpm — emitting to ViewModel
 BleManager: Readings received from device: 2 values
 BleManager:   → SPO2 = 95
 BleManager:   → PULSE = 72

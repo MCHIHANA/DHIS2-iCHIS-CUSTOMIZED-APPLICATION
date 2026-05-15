@@ -1,10 +1,10 @@
 # Immediate Fix Steps - Try These NOW
 
 ## Your Device is Correct
-- ✓ Device Name: FORA02
-- ✓ MAC: C0:26:DA:17:D5:7D (matches app)
-- ✓ Works in nRF Connect
-- ✓ Android 11 with Location enabled
+-  Device Name: FORA02
+-  MAC: C0:26:DA:17:D5:7D (matches app)
+-  Works in nRF Connect
+-  Android 11 with Location enabled
 
 ## The Problem
 The app shows "Waiting for sensor..." forever, which means the BLE scan is either:
@@ -143,8 +143,8 @@ If it doesn't connect within 10 seconds, something else is wrong.
 ## What to Report Back
 
 Tell me:
-1. ✓ or ✗ - Did you unpair the device?
-2. ✓ or ✗ - Did the dialog show different messages after unpairing?
+1.  or  - Did you unpair the device?
+2.  or  - Did the dialog show different messages after unpairing?
 3. What message is the dialog stuck on?
 4. If you have logs, what do they show?
 

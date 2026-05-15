@@ -1,12 +1,12 @@
-# ✅ Verify DataStore Access
+#  Verify DataStore Access
 
 ## Your DataStore Entry Exists!
 
 **URL**: https://project.ccdev.org/ictprojects/dhis-web-datastore/index.html#/edit/sensor-config/vital-sensor-mapping
 
-This confirms the DataStore entry is created correctly! ✅
+This confirms the DataStore entry is created correctly! 
 
-## 🔍 Now Let's Verify API Access
+##  Now Let's Verify API Access
 
 The app uses the **API endpoint**, not the web UI. Let's verify the API is accessible:
 
@@ -20,9 +20,9 @@ https://project.ccdev.org/ictprojects/api/dataStore/sensor-config/vital-sensor-m
 
 **Expected result**: You should see your JSON configuration.
 
-**If you see JSON**: ✅ API is accessible!
+**If you see JSON**:  API is accessible!
 
-**If you see 404 or error**: ❌ There's an issue with the API endpoint.
+**If you see 404 or error**:  There's an issue with the API endpoint.
 
 ### Step 2: Check All DataStore Entries
 
@@ -65,7 +65,7 @@ When you access the API endpoint, verify the JSON has this structure:
 }
 ```
 
-## 🎯 Important: API Path
+##  Important: API Path
 
 I notice your DHIS2 is at:
 ```
@@ -77,13 +77,13 @@ The app needs to know this base URL. Let me check if the app is configured corre
 ### Possible Issue: Base URL
 
 If your app is configured with:
-- ❌ `https://project.ccdev.org/` (missing `/ictprojects/`)
+-  `https://project.ccdev.org/` (missing `/ictprojects/`)
 
 Then the API calls will go to:
-- ❌ `https://project.ccdev.org/api/dataStore/...` (WRONG!)
+-  `https://project.ccdev.org/api/dataStore/...` (WRONG!)
 
 Instead of:
-- ✅ `https://project.ccdev.org/ictprojects/api/dataStore/...` (CORRECT!)
+-  `https://project.ccdev.org/ictprojects/api/dataStore/...` (CORRECT!)
 
 ### How to Check
 
@@ -96,7 +96,7 @@ If it's wrong, you need to:
 2. **Login again** with the correct server URL
 3. **Sync metadata**
 
-## 🚀 Quick Test
+##  Quick Test
 
 Before rebuilding the app, let's verify the API is accessible:
 
@@ -112,7 +112,7 @@ Before rebuilding the app, let's verify the API is accessible:
 2. **Check** what server URL is configured
 3. **Verify** it includes `/ictprojects/`
 
-## 📝 What to Share
+##  What to Share
 
 Please share:
 
@@ -128,19 +128,19 @@ Please share:
 3. **Any error messages** from the browser or app
 
 This will help us understand if the issue is:
-- ❌ API not accessible
-- ❌ Wrong server URL in app
-- ❌ Permission issue
-- ❌ Something else
+-  API not accessible
+-  Wrong server URL in app
+-  Permission issue
+-  Something else
 
-## 🎯 Expected Outcome
+##  Expected Outcome
 
 If the API is accessible and the server URL is correct, then after rebuilding with enhanced logging, we should see:
 
 ```
-SensorConfigApi: DataStore query returned 1 entries ✅
-SensorConfigApi: ✓ Found DataStore entry (XXX chars) ✅
-SensorConfig: ✓ Loaded sensors: 3 ✅
+SensorConfigApi: DataStore query returned 1 entries 
+SensorConfigApi:  Found DataStore entry (XXX chars) 
+SensorConfig:  Loaded sensors: 3 
 ```
 
 If not, the logs will tell us exactly what's wrong!

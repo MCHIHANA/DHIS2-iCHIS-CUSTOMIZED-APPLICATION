@@ -10,9 +10,9 @@ BleManager: Readings received from device: 3 values
   → DIASTOLIC = 55
   → PULSE = 62
 
-SENSOR_DATA: Sensor config found: null ❌
-SENSOR_DATA: isMultiMeasurement: false ❌
-SENSOR_DATA: Using legacy index-based mapping ❌
+SENSOR_DATA: Sensor config found: null 
+SENSOR_DATA: isMultiMeasurement: false 
+SENSOR_DATA: Using legacy index-based mapping 
 SENSOR_DATA: Processing reading 0: key=SYSTOLIC, value=108, targetField=skBarAsIYIL
 SENSOR_SAVE: Saving SYSTOLIC=108 to field skBarAsIYIL
 ```
@@ -24,12 +24,12 @@ SENSOR_SAVE: Saving SYSTOLIC=108 to field skBarAsIYIL
 
 ## Solution Applied
 
-### 1. Updated Diastolic UID ✅
+### 1. Updated Diastolic UID 
 Changed hardcoded UID from `skBarAsIYIL` to `BaGxiB8AsNI` to match your DHIS2 instance.
 
 **File**: `form/src/main/java/org/dhis2/form/ui/provider/inputfield/FieldProvider.kt`
 
-### 2. Created DataStore Configuration ✅
+### 2. Created DataStore Configuration 
 Created `BP_SENSOR_DATASTORE_CONFIG.json` with proper mapping:
 ```json
 {
@@ -41,7 +41,7 @@ Created `BP_SENSOR_DATASTORE_CONFIG.json` with proper mapping:
 }
 ```
 
-### 3. Created Setup Guide ✅
+### 3. Created Setup Guide 
 See `HOW_TO_CONFIGURE_BP_SENSOR_DATASTORE.md` for detailed instructions.
 
 ## Next Steps (REQUIRED)
@@ -86,15 +86,15 @@ The code has fallback logic, but it won't work properly without DataStore config
 When you connect the BP sensor, you should see in logs:
 
 ```
-SENSOR_DATA: Sensor config found: Blood Pressure Monitor ✅
-SENSOR_DATA: isMultiMeasurement: true ✅
-SENSOR_DATA: Multi-measurement sensor detected ✅
-SENSOR_DATA: Mapping SYSTOLIC → HkfzcXMdLLF ✅
-SENSOR_DATA: Mapping DIASTOLIC → BaGxiB8AsNI ✅
-SENSOR_DATA: Mapping PULSE → S7OjKl85YSh ✅
-SENSOR_SAVE: Saving SYSTOLIC=108 to field HkfzcXMdLLF ✅
-SENSOR_SAVE: Saving DIASTOLIC=55 to field BaGxiB8AsNI ✅
-SENSOR_SAVE: Saving PULSE=62 to field S7OjKl85YSh ✅
+SENSOR_DATA: Sensor config found: Blood Pressure Monitor 
+SENSOR_DATA: isMultiMeasurement: true 
+SENSOR_DATA: Multi-measurement sensor detected 
+SENSOR_DATA: Mapping SYSTOLIC → HkfzcXMdLLF 
+SENSOR_DATA: Mapping DIASTOLIC → BaGxiB8AsNI 
+SENSOR_DATA: Mapping PULSE → S7OjKl85YSh 
+SENSOR_SAVE: Saving SYSTOLIC=108 to field HkfzcXMdLLF 
+SENSOR_SAVE: Saving DIASTOLIC=55 to field BaGxiB8AsNI 
+SENSOR_SAVE: Saving PULSE=62 to field S7OjKl85YSh 
 ```
 
 And all three fields will be filled:

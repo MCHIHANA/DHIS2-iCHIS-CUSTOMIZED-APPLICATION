@@ -1,13 +1,13 @@
 # Blood Pressure Sensor - Current Status
 
-## ✅ Code Changes Completed
+##  Code Changes Completed
 
 ### 1. Updated Diastolic UID in FieldProvider.kt
 **File**: `form/src/main/java/org/dhis2/form/ui/provider/inputfield/FieldProvider.kt`
 
 Changed hardcoded Diastolic UID:
-- **Old**: `skBarAsIYIL` ❌
-- **New**: `BaGxiB8AsNI` ✅
+- **Old**: `skBarAsIYIL` 
+- **New**: `BaGxiB8AsNI` 
 
 ### 2. Updated Documentation in SensorConfigModels.kt
 **File**: `form/src/main/java/org/dhis2/sensor/config/SensorConfigModels.kt`
@@ -27,12 +27,12 @@ Updated example configuration with correct UIDs:
 **File**: `form/src/main/java/org/dhis2/form/ui/FormViewModel.kt`
 
 The `observeSensorData()` function now:
-- ✅ Checks for sensor configuration from DataStore
-- ✅ Uses multi-measurement mapping when config is found
-- ✅ Maps semantic keys (SYSTOLIC, DIASTOLIC, PULSE) to data element UIDs
-- ✅ Falls back to legacy index-based mapping if no config found
+-  Checks for sensor configuration from DataStore
+-  Uses multi-measurement mapping when config is found
+-  Maps semantic keys (SYSTOLIC, DIASTOLIC, PULSE) to data element UIDs
+-  Falls back to legacy index-based mapping if no config found
 
-## ⚠️ User Action Required
+##  User Action Required
 
 ### Critical: Update DHIS2 DataStore Configuration
 
@@ -43,8 +43,8 @@ Your DHIS2 DataStore currently has **incorrect UIDs**. You must update it:
 {
   "measurements": {
     "systolic": {"dataElement": "HkfzcXMdLLF"},
-    "diastolic": {"dataElement": "skBarAsIYIL"},  // ❌ WRONG
-    "pulse": {"dataElement": "tZbUrUbhUNy"}       // ❌ WRONG
+    "diastolic": {"dataElement": "skBarAsIYIL"},  //  WRONG
+    "pulse": {"dataElement": "tZbUrUbhUNy"}       //  WRONG
   }
 }
 ```
@@ -54,8 +54,8 @@ Your DHIS2 DataStore currently has **incorrect UIDs**. You must update it:
 {
   "measurements": {
     "systolic": {"dataElement": "HkfzcXMdLLF"},
-    "diastolic": {"dataElement": "BaGxiB8AsNI"},  // ✅ CORRECT
-    "pulse": {"dataElement": "S7OjKl85YSh"}       // ✅ CORRECT
+    "diastolic": {"dataElement": "BaGxiB8AsNI"},  //  CORRECT
+    "pulse": {"dataElement": "S7OjKl85YSh"}       //  CORRECT
   }
 }
 ```
@@ -74,7 +74,7 @@ Quick steps:
 7. Sync metadata in the app
 8. Test BP sensor
 
-## 📊 Expected Behavior After Fix
+##  Expected Behavior After Fix
 
 ### When BP Sensor Sends Data:
 ```
@@ -84,31 +84,31 @@ PULSE = 60
 ```
 
 ### App Should Save To:
-- **Systolic Pressure** (HkfzcXMdLLF) = 99 ✅
-- **Diastolic Pressure** (BaGxiB8AsNI) = 82 ✅
-- **Heart Rate** (S7OjKl85YSh) = 60 ✅
+- **Systolic Pressure** (HkfzcXMdLLF) = 99 
+- **Diastolic Pressure** (BaGxiB8AsNI) = 82 
+- **Heart Rate** (S7OjKl85YSh) = 60 
 
 ### Expected Logs:
 ```
-SENSOR_DATA: Sensor config found: Blood Pressure ✅
-SENSOR_DATA: isMultiMeasurement: true ✅
-SENSOR_DATA: Multi-measurement sensor detected: Blood Pressure ✅
-SENSOR_DATA: Mapping SYSTOLIC → HkfzcXMdLLF ✅
-SENSOR_DATA: Mapping DIASTOLIC → BaGxiB8AsNI ✅
-SENSOR_DATA: Mapping PULSE → S7OjKl85YSh ✅
-SENSOR_SAVE: Saving SYSTOLIC=99 to field HkfzcXMdLLF ✅
-SENSOR_SAVE: Saving DIASTOLIC=82 to field BaGxiB8AsNI ✅
-SENSOR_SAVE: Saving PULSE=60 to field S7OjKl85YSh ✅
+SENSOR_DATA: Sensor config found: Blood Pressure 
+SENSOR_DATA: isMultiMeasurement: true 
+SENSOR_DATA: Multi-measurement sensor detected: Blood Pressure 
+SENSOR_DATA: Mapping SYSTOLIC → HkfzcXMdLLF 
+SENSOR_DATA: Mapping DIASTOLIC → BaGxiB8AsNI 
+SENSOR_DATA: Mapping PULSE → S7OjKl85YSh 
+SENSOR_SAVE: Saving SYSTOLIC=99 to field HkfzcXMdLLF 
+SENSOR_SAVE: Saving DIASTOLIC=82 to field BaGxiB8AsNI 
+SENSOR_SAVE: Saving PULSE=60 to field S7OjKl85YSh 
 ```
 
-## 🔍 Current Problem
+##  Current Problem
 
 From your logs, the issue is:
 1. **DataStore config not loading**: `Sensor config found: null`
 2. **Falls back to legacy mapping**: `isMultiMeasurement: false`
 3. **Only saves first value**: Only SYSTOLIC (99) is saved to wrong field
 
-## 🛠️ Troubleshooting
+##  Troubleshooting
 
 ### If DataStore Update Doesn't Work:
 
@@ -132,22 +132,22 @@ From your logs, the issue is:
    - Verify `/api/dataStore/sensorConfig/config` returns correct data
    - Check network logs in the app
 
-## 📁 Related Files
+##  Related Files
 
 - `UPDATE_DATASTORE_DIASTOLIC_UID.md` - Step-by-step DataStore update guide
 - `BP_SENSOR_QUICK_FIX.md` - Problem summary
 - `HOW_TO_CONFIGURE_BP_SENSOR_DATASTORE.md` - Detailed configuration guide
 - `BP_SENSOR_DATASTORE_CONFIG.json` - Correct configuration template
 
-## ✅ Compilation Status
+##  Compilation Status
 
 All files compile successfully with no errors:
-- ✅ `FormViewModel.kt` - No diagnostics
-- ✅ `FormView.kt` - No diagnostics
-- ✅ `FieldProvider.kt` - No diagnostics
-- ✅ `SensorConfigRepository.kt` - No diagnostics
+-  `FormViewModel.kt` - No diagnostics
+-  `FormView.kt` - No diagnostics
+-  `FieldProvider.kt` - No diagnostics
+-  `SensorConfigRepository.kt` - No diagnostics
 
-## 🚀 Next Steps
+##  Next Steps
 
 1. **Update DataStore** (see UPDATE_DATASTORE_DIASTOLIC_UID.md)
 2. **Clear app data** on Android device

@@ -1,14 +1,14 @@
 # Vital Signs Dashboard - Quick Start Guide
 
-## 🎯 What Was Implemented
+##  What Was Implemented
 
 A production-grade **Vital Signs Dashboard** integrated directly into the DHIS2 Capture Android application for real-time patient monitoring by authorized healthcare workers.
 
 ---
 
-## ✅ Implementation Status
+##  Implementation Status
 
-**Status:** ✅ **COMPLETE - Ready for Testing**  
+**Status:**  **COMPLETE - Ready for Testing**  
 **Branch:** `feature/shadreck-vital-signs-dashboard`  
 **Commits:** 3 commits, pushed to remote  
 **Files Created:** 13 new files  
@@ -16,28 +16,28 @@ A production-grade **Vital Signs Dashboard** integrated directly into the DHIS2 
 
 ---
 
-## 📦 What's Included
+##  What's Included
 
 ### Core Features
-✅ Patient summary cards with latest vital signs  
-✅ Recent measurements timeline  
-✅ Trend visualizations with charts  
-✅ Medical alerts system  
-✅ Offline-first support  
-✅ Role-based access control (Doctors, Clinicians, Administrators)
+ Patient summary cards with latest vital signs  
+ Recent measurements timeline  
+ Trend visualizations with charts  
+ Medical alerts system  
+ Offline-first support  
+ Role-based access control (Doctors, Clinicians, Administrators)
 
 ### Technical Implementation
-✅ MVVM architecture with Jetpack Compose  
-✅ DHIS2 SDK integration  
-✅ Dagger dependency injection  
-✅ Coroutines + StateFlow for reactive programming  
-✅ Navigation integration with MainActivity  
-✅ Menu item and icon added  
-✅ String resources configured
+ MVVM architecture with Jetpack Compose  
+ DHIS2 SDK integration  
+ Dagger dependency injection  
+ Coroutines + StateFlow for reactive programming  
+ Navigation integration with MainActivity  
+ Menu item and icon added  
+ String resources configured
 
 ---
 
-## 🚀 How to Access
+##  How to Access
 
 1. **Build and Install the App**
    ```bash
@@ -49,14 +49,14 @@ A production-grade **Vital Signs Dashboard** integrated directly into the DHIS2 
    - Must have role: Doctor, Clinician, or Administrator
 
 3. **Open Navigation Drawer**
-   - Tap the menu icon (☰) in the top-left corner
+   - Tap the menu icon () in the top-left corner
 
 4. **Select "Vital Signs Dashboard"**
    - Dashboard will open with 4 tabs: Overview, Trends, Recent, Alerts
 
 ---
 
-## ⚙️ Configuration Required
+##  Configuration Required
 
 ### IMPORTANT: Update Data Element UIDs
 
@@ -95,7 +95,7 @@ private val dataElementMapping = mapOf(
 
 ---
 
-## 📁 Files Created
+##  Files Created
 
 ### Core Implementation (10 files)
 1. `VitalDashboardFragment.kt` - Main UI fragment
@@ -127,7 +127,7 @@ private val dataElementMapping = mapOf(
 
 ---
 
-## 🧪 Testing Checklist
+##  Testing Checklist
 
 ### Before Testing
 - [ ] Update `VitalSignConfig.kt` with actual data element UIDs
@@ -154,7 +154,7 @@ private val dataElementMapping = mapOf(
 
 ---
 
-## 🔗 Git Information
+##  Git Information
 
 ### Branch
 ```
@@ -167,7 +167,7 @@ feature/shadreck-vital-signs-dashboard
 3. **4b539e2** - Comprehensive documentation (1 file, 659 insertions)
 
 ### Remote Status
-✅ **Pushed to GitHub**
+ **Pushed to GitHub**
 
 ### Create Pull Request
 ```
@@ -176,7 +176,7 @@ https://github.com/MCHIHANA/DHIS2-iCHIS-CUSTOMIZED-APPLICATION/pull/new/feature/
 
 ---
 
-## 📚 Documentation
+##  Documentation
 
 ### Full Implementation Guide
 See `VITAL_SIGNS_DASHBOARD_IMPLEMENTATION.md` for:
@@ -195,12 +195,12 @@ See `AGENTS.md` for:
 
 ---
 
-## 🎯 Next Steps
+##  Next Steps
 
 ### Immediate (Required)
-1. ✅ **Configure Data Element UIDs** in `VitalSignConfig.kt`
-2. ✅ **Test with Physical DHIS2 Instance**
-3. ✅ **Verify Role-Based Access Control**
+1.  **Configure Data Element UIDs** in `VitalSignConfig.kt`
+2.  **Test with Physical DHIS2 Instance**
+3.  **Verify Role-Based Access Control**
 
 ### Short-term (Recommended)
 4. **UI/UX Review** with healthcare workers
@@ -215,7 +215,7 @@ See `AGENTS.md` for:
 
 ---
 
-## 🐛 Troubleshooting
+##  Troubleshooting
 
 ### Dashboard Not Showing in Menu
 **Solution:** Rebuild project and sync Gradle files
@@ -231,7 +231,7 @@ See `AGENTS.md` for:
 
 ---
 
-## 👤 Feature Owner
+##  Feature Owner
 
 **Name:** Shadreck Mkandawire  
 **Feature:** Vital Signs Dashboard  
@@ -239,7 +239,7 @@ See `AGENTS.md` for:
 
 ---
 
-## 📞 Support
+##  Support
 
 For questions or issues:
 1. Check `VITAL_SIGNS_DASHBOARD_IMPLEMENTATION.md` for detailed documentation
@@ -248,8 +248,8 @@ For questions or issues:
 
 ---
 
-## ✨ Summary
+##  Summary
 
 The Vital Signs Dashboard is now **fully integrated** into the DHIS2 Capture application. The implementation is **production-ready** and follows all DHIS2 best practices. 
 
-**Next Action:** Configure data element UIDs and test with your DHIS2 instance! 🚀
+**Next Action:** Configure data element UIDs and test with your DHIS2 instance! 

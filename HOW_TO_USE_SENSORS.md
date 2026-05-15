@@ -2,9 +2,9 @@
 
 ## Changes Made
 
-✓ Removed device counting logic (was causing confusion)
-✓ Changed status message to "Connected - Place finger on sensor now!"
-✓ Added green icon and clearer UI when waiting for finger placement
+ Removed device counting logic (was causing confusion)
+ Changed status message to "Connected - Place finger on sensor now!"
+ Added green icon and clearer UI when waiting for finger placement
 
 ## For SPO2/Pulse Oximeter (FORA O2)
 
@@ -141,20 +141,20 @@
 ## Tips for Success
 
 ### Oximeter
-- ✓ Finger fully inserted
-- ✓ Finger still (don't move!)
-- ✓ Wait for LED to stabilize
-- ✓ Clean finger (no nail polish)
-- ✓ Try index finger first
-- ✓ Sensor battery good
-- ✓ Wait at least 10 seconds
+-  Finger fully inserted
+-  Finger still (don't move!)
+-  Wait for LED to stabilize
+-  Clean finger (no nail polish)
+-  Try index finger first
+-  Sensor battery good
+-  Wait at least 10 seconds
 
 ### Thermometer
-- ✓ Press sensor button
-- ✓ Point at target area
-- ✓ Keep steady
-- ✓ Wait for beep
-- ✓ Sensor battery good
+-  Press sensor button
+-  Point at target area
+-  Keep steady
+-  Wait for beep
+-  Sensor battery good
 
 ## What the Colors Mean
 
@@ -189,11 +189,11 @@
 ## Success Indicators
 
 You'll know it's working when:
-- ✓ Dialog shows green "Place finger" message
-- ✓ After placing finger, values appear within 15 seconds
-- ✓ Both SpO2 and Pulse fields fill (for oximeter)
-- ✓ Temperature field fills (for thermometer)
-- ✓ Values are reasonable:
+-  Dialog shows green "Place finger" message
+-  After placing finger, values appear within 15 seconds
+-  Both SpO2 and Pulse fields fill (for oximeter)
+-  Temperature field fills (for thermometer)
+-  Values are reasonable:
   - SpO2: 90-100%
   - Pulse: 50-120 bpm
   - Temperature: 35-38°C (95-100°F)

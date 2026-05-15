@@ -1,6 +1,6 @@
 # Update DHIS2 Datastore Configuration
 
-## ⚠️ CRITICAL: Your Sensor Configuration Needs Updating
+##  CRITICAL: Your Sensor Configuration Needs Updating
 
 The logs show the app is using **legacy index-based mapping** instead of the new semantic key mapping. This means your DHIS2 datastore configuration doesn't have the new `measurements` structure.
 
@@ -136,7 +136,7 @@ Save this as `sensor_config.json`:
 }
 ```
 
-## ⚠️ IMPORTANT: Replace Data Element UIDs
+##  IMPORTANT: Replace Data Element UIDs
 
 Make sure to replace these with your actual DHIS2 data element UIDs:
 - `TEMP_DATA_ELEMENT_UID` - Your temperature data element
@@ -210,4 +210,4 @@ If you don't see this, the configuration is not being loaded from the datastore.
 
 ---
 
-**The code is correct. You just need to update the datastore configuration!** ✅
+**The code is correct. You just need to update the datastore configuration!** 

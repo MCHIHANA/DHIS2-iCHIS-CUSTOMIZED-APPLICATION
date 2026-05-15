@@ -9,14 +9,14 @@ This guide provides comprehensive testing procedures for the FORA D40b Blood Pre
 ## Prerequisites
 
 ### Hardware
-- ✅ FORA D40b Blood Pressure Monitor (MAC: C0:26:DA:19:D4:FE)
-- ✅ Android device with BLE support (Android 4.3+ / API 18+)
-- ✅ Fresh batteries in BP monitor
+-  FORA D40b Blood Pressure Monitor (MAC: C0:26:DA:19:D4:FE)
+-  Android device with BLE support (Android 4.3+ / API 18+)
+-  Fresh batteries in BP monitor
 
 ### Software
-- ✅ DHIS2 Android app with BP sensor integration
-- ✅ Android Studio with Logcat access
-- ✅ nRF Connect app (for BLE verification)
+-  DHIS2 Android app with BP sensor integration
+-  Android Studio with Logcat access
+-  nRF Connect app (for BLE verification)
 
 ### Permissions
 Ensure the following permissions are granted:
@@ -84,11 +84,11 @@ BLE_SCAN: Scan stopped
 BLE_CONNECT: Connecting to C0:26:DA:19:D4:FE (type=BLOOD_PRESSURE)...
 BLE_CONNECT: Connected to C0:26:DA:19:D4:FE
 BLE_SERVICE: Services discovered (status=0) for BLOOD_PRESSURE
-BLE_SERVICE: ✓ Found Blood Pressure service: 00001810-...
-BLE_SERVICE: ✓ Found BP Measurement characteristic: 00002a35-..., properties=32
-BLE_SERVICE: ✓ Found CCCD descriptor, writing ENABLE_INDICATION_VALUE
+BLE_SERVICE:  Found Blood Pressure service: 00001810-...
+BLE_SERVICE:  Found BP Measurement characteristic: 00002a35-..., properties=32
+BLE_SERVICE:  Found CCCD descriptor, writing ENABLE_INDICATION_VALUE
 BLE_SERVICE: *** onDescriptorWrite: 00002a35-... status=0 ***
-BLE_SERVICE: ✓ Descriptor write SUCCESS for 00002a35-...
+BLE_SERVICE:  Descriptor write SUCCESS for 00002a35-...
 BLE_SERVICE: Waiting for data from sensor...
 ```
 
@@ -97,12 +97,12 @@ BLE_SERVICE: Waiting for data from sensor...
 - Status: "Connected - Place finger on sensor now!"
 
 **Pass Criteria**:
-- ✅ Scan starts
-- ✅ Device discovered within 5 seconds
-- ✅ Connection established
-- ✅ Services discovered
-- ✅ Characteristic subscribed
-- ✅ No errors in Logcat
+-  Scan starts
+-  Device discovered within 5 seconds
+-  Connection established
+-  Services discovered
+-  Characteristic subscribed
+-  No errors in Logcat
 
 ---
 
@@ -138,7 +138,7 @@ BLE_BP: === Final Values (mmHg) ===
 BLE_BP: Systolic: 120.0 mmHg
 BLE_BP: Diastolic: 80.0 mmHg
 BLE_BP: MAP: 94.0 mmHg
-BLE_BP: ✓ Valid BP reading: 120/80 mmHg
+BLE_BP:  Valid BP reading: 120/80 mmHg
 SENSOR_DATA: Received 2 readings for primary field: HkfzcXMdLLF
 SENSOR_DATA: Processing reading 0: key=SYSTOLIC, value=120, targetField=HkfzcXMdLLF
 SENSOR_SAVE: Saving SYSTOLIC=120 to field HkfzcXMdLLF
@@ -153,11 +153,11 @@ SENSOR_SAVE: Saving DIASTOLIC=80 to field skBarAsIYIL
 - Status: "Data received: 80" (diastolic field)
 
 **Pass Criteria**:
-- ✅ Notification received
-- ✅ Packet parsed correctly
-- ✅ Values in valid range (50-250 systolic, 30-150 diastolic)
-- ✅ Both fields populated
-- ✅ Values match device display
+-  Notification received
+-  Packet parsed correctly
+-  Values in valid range (50-250 systolic, 30-150 diastolic)
+-  Both fields populated
+-  Values match device display
 
 ---
 
@@ -189,9 +189,9 @@ SENSOR_SAVE: Saving PULSE=75 to field tZbUrUbhUNy
 - Pulse field: `75`
 
 **Pass Criteria**:
-- ✅ Three readings received
-- ✅ Pulse rate in valid range (30-250 bpm)
-- ✅ All three fields populated
+-  Three readings received
+-  Pulse rate in valid range (30-250 bpm)
+-  All three fields populated
 
 **Note**: Some BP monitors send pulse rate in a separate packet or don't send it at all. This is device-dependent.
 
@@ -210,10 +210,10 @@ SENSOR_SAVE: Saving PULSE=75 to field tZbUrUbhUNy
 6. Take third BP measurement
 
 **Pass Criteria**:
-- ✅ All three measurements received
-- ✅ No disconnection between measurements
-- ✅ Fields updated with each new reading
-- ✅ No memory leaks (check Android Profiler)
+-  All three measurements received
+-  No disconnection between measurements
+-  Fields updated with each new reading
+-  No memory leaks (check Android Profiler)
 
 ---
 
@@ -237,10 +237,10 @@ BLE_CONNECT: Disconnected from C0:26:DA:19:D4:FE (status=8)
 - Status: "Disconnected"
 
 **Pass Criteria**:
-- ✅ Disconnection detected
-- ✅ UI updated to show disconnected state
-- ✅ Can reconnect successfully
-- ✅ No app crash
+-  Disconnection detected
+-  UI updated to show disconnected state
+-  Can reconnect successfully
+-  No app crash
 
 ---
 
@@ -259,9 +259,9 @@ BLE_CONNECT: Disconnected from C0:26:DA:19:D4:FE (status=8)
 - User can manually enter values
 
 **Pass Criteria**:
-- ✅ No crash
-- ✅ User can dismiss scan dialog
-- ✅ Manual entry still works
+-  No crash
+-  User can dismiss scan dialog
+-  Manual entry still works
 
 ---
 
@@ -283,9 +283,9 @@ BLE_SCAN: Bluetooth is disabled - cannot scan
 - OR prompt to enable Bluetooth
 
 **Pass Criteria**:
-- ✅ No crash
-- ✅ Clear error message
-- ✅ User can enable Bluetooth and retry
+-  No crash
+-  Clear error message
+-  User can enable Bluetooth and retry
 
 ---
 
@@ -307,9 +307,9 @@ BLE_SCAN: SecurityException starting scan - missing permissions?
 - OR error message about missing permissions
 
 **Pass Criteria**:
-- ✅ No crash
-- ✅ Permission requested
-- ✅ Works after permission granted
+-  No crash
+-  Permission requested
+-  Works after permission granted
 
 ---
 
@@ -334,9 +334,9 @@ BLE_BP: Blood pressure values out of range — skipping
 ```
 
 **Pass Criteria**:
-- ✅ Invalid values rejected
-- ✅ No fields populated with invalid data
-- ✅ No crash
+-  Invalid values rejected
+-  No fields populated with invalid data
+-  No crash
 
 ---
 
@@ -364,9 +364,9 @@ BLE_BP: Diastolic: 82.5 mmHg
 ```
 
 **Pass Criteria**:
-- ✅ kPa detected from flags
-- ✅ Conversion applied (1 kPa = 7.50062 mmHg)
-- ✅ Values in mmHg saved to fields
+-  kPa detected from flags
+-  Conversion applied (1 kPa = 7.50062 mmHg)
+-  Values in mmHg saved to fields
 
 ---
 
@@ -393,9 +393,9 @@ val negExpPacket = byteArrayOf(0x00, 0xB8.toByte(), 0xF0.toByte(), 0x50, 0x00, 0
 **Expected**: 120 mmHg systolic
 
 **Pass Criteria**:
-- ✅ NaN handled correctly
-- ✅ Negative exponents work
-- ✅ Sign extension correct
+-  NaN handled correctly
+-  Negative exponents work
+-  Sign extension correct
 
 ---
 
@@ -420,9 +420,9 @@ val negExpPacket = byteArrayOf(0x00, 0xB8.toByte(), 0xF0.toByte(), 0x50, 0x00, 0
 3. Take measurement
 
 **Pass Criteria**:
-- ✅ Config loaded successfully
-- ✅ Fields populated correctly
-- ✅ No errors
+-  Config loaded successfully
+-  Fields populated correctly
+-  No errors
 
 ---
 
@@ -467,9 +467,9 @@ val negExpPacket = byteArrayOf(0x00, 0xB8.toByte(), 0xF0.toByte(), 0x50, 0x00, 0
 4. Check memory graph
 
 **Pass Criteria**:
-- ✅ No memory leaks
-- ✅ Memory returns to baseline after disconnect
-- ✅ No retained objects
+-  No memory leaks
+-  Memory returns to baseline after disconnect
+-  No retained objects
 
 ---
 
@@ -489,11 +489,11 @@ val negExpPacket = byteArrayOf(0x00, 0xB8.toByte(), 0xF0.toByte(), 0x50, 0x00, 0
 7. Verify data on DHIS2 web
 
 **Pass Criteria**:
-- ✅ Data saved locally
-- ✅ Data synced to server
-- ✅ Data visible on DHIS2 web
-- ✅ Correct data element UIDs
-- ✅ Correct units
+-  Data saved locally
+-  Data synced to server
+-  Data visible on DHIS2 web
+-  Correct data element UIDs
+-  Correct units
 
 ---
 
@@ -508,9 +508,9 @@ val negExpPacket = byteArrayOf(0x00, 0xB8.toByte(), 0xF0.toByte(), 0x50, 0x00, 0
 4. Verify all fields populated correctly
 
 **Pass Criteria**:
-- ✅ No interference between sensors
-- ✅ Correct values in correct fields
-- ✅ No data mixing
+-  No interference between sensors
+-  Correct values in correct fields
+-  No data mixing
 
 ---
 
@@ -526,9 +526,9 @@ val negExpPacket = byteArrayOf(0x00, 0xB8.toByte(), 0xF0.toByte(), 0x50, 0x00, 0
 3. Verify both still work
 
 **Pass Criteria**:
-- ✅ Temperature sensor works
-- ✅ SpO2 sensor works
-- ✅ No regressions
+-  Temperature sensor works
+-  SpO2 sensor works
+-  No regressions
 
 ---
 
@@ -543,9 +543,9 @@ val negExpPacket = byteArrayOf(0x00, 0xB8.toByte(), 0xF0.toByte(), 0x50, 0x00, 0
 2. Take 5 measurements back-to-back (30 sec apart)
 
 **Pass Criteria**:
-- ✅ All measurements received
-- ✅ No data loss
-- ✅ No UI freezing
+-  All measurements received
+-  No data loss
+-  No UI freezing
 
 ---
 
@@ -561,9 +561,9 @@ val negExpPacket = byteArrayOf(0x00, 0xB8.toByte(), 0xF0.toByte(), 0x50, 0x00, 0
 5. Take measurement
 
 **Pass Criteria**:
-- ✅ Connection maintained
-- OR ✅ Graceful reconnection
-- ✅ Measurement received
+-  Connection maintained
+- OR  Graceful reconnection
+-  Measurement received
 
 ---
 
@@ -658,26 +658,26 @@ fun `parseBloodPressure should convert kPa to mmHg`() {
 
 | Test # | Test Name | Status | Notes |
 |--------|-----------|--------|-------|
-| 1 | Basic Connection | ✅ PASS | Connected in 3s |
-| 2 | BP Measurement | ✅ PASS | 120/80 received |
-| 3 | Pulse Rate | ✅ PASS | 75 bpm received |
-| 4 | Multiple Measurements | ✅ PASS | 3 readings OK |
-| 5 | Connection Loss | ✅ PASS | Reconnected OK |
-| 6 | Scan Timeout | ✅ PASS | Manual entry works |
-| 7 | Bluetooth Disabled | ✅ PASS | Error shown |
-| 8 | Permission Denial | ✅ PASS | Permission requested |
-| 9 | Invalid Data | ✅ PASS | Rejected correctly |
-| 10 | kPa Conversion | ⚠️ SKIP | Device sends mmHg only |
-| 11 | SFLOAT Edge Cases | ✅ PASS | NaN handled |
-| 12 | Backward Compat | ✅ PASS | Legacy config works |
-| 13 | Scan Performance | ✅ PASS | 2.5s discovery |
-| 14 | Connection Perf | ✅ PASS | 4s total |
-| 15 | Memory Usage | ✅ PASS | No leaks |
-| 16 | E2E Form Submit | ✅ PASS | Data synced |
-| 17 | Multi-Sensor | ✅ PASS | No interference |
-| 18 | Existing Sensors | ✅ PASS | Temp/SpO2 OK |
-| 19 | Rapid Measurements | ✅ PASS | 5 readings OK |
-| 20 | App Backgrounding | ✅ PASS | Connection maintained |
+| 1 | Basic Connection |  PASS | Connected in 3s |
+| 2 | BP Measurement |  PASS | 120/80 received |
+| 3 | Pulse Rate |  PASS | 75 bpm received |
+| 4 | Multiple Measurements |  PASS | 3 readings OK |
+| 5 | Connection Loss |  PASS | Reconnected OK |
+| 6 | Scan Timeout |  PASS | Manual entry works |
+| 7 | Bluetooth Disabled |  PASS | Error shown |
+| 8 | Permission Denial |  PASS | Permission requested |
+| 9 | Invalid Data |  PASS | Rejected correctly |
+| 10 | kPa Conversion |  SKIP | Device sends mmHg only |
+| 11 | SFLOAT Edge Cases |  PASS | NaN handled |
+| 12 | Backward Compat |  PASS | Legacy config works |
+| 13 | Scan Performance |  PASS | 2.5s discovery |
+| 14 | Connection Perf |  PASS | 4s total |
+| 15 | Memory Usage |  PASS | No leaks |
+| 16 | E2E Form Submit |  PASS | Data synced |
+| 17 | Multi-Sensor |  PASS | No interference |
+| 18 | Existing Sensors |  PASS | Temp/SpO2 OK |
+| 19 | Rapid Measurements |  PASS | 5 readings OK |
+| 20 | App Backgrounding |  PASS | Connection maintained |
 
 ## Issues Found
 
@@ -691,7 +691,7 @@ fun `parseBloodPressure should convert kPa to mmHg`() {
 
 ## Conclusion
 
-Overall Status: ✅ PASS / ⚠️ PARTIAL / ❌ FAIL
+Overall Status:  PASS /  PARTIAL /  FAIL
 
 [Summary paragraph]
 ```
@@ -777,15 +777,15 @@ This testing guide covers all aspects of the Blood Pressure sensor integration. 
 7. Advanced tests (19-20)
 
 **Minimum Required Tests for Production**:
-- ✅ Test 1: Basic Connection
-- ✅ Test 2: BP Measurement
-- ✅ Test 5: Connection Loss
-- ✅ Test 7: Bluetooth Disabled
-- ✅ Test 16: E2E Form Submit
-- ✅ Test 18: Existing Sensors
+-  Test 1: Basic Connection
+-  Test 2: BP Measurement
+-  Test 5: Connection Loss
+-  Test 7: Bluetooth Disabled
+-  Test 16: E2E Form Submit
+-  Test 18: Existing Sensors
 
 ---
 
 **Document Version**: 1.0  
 **Last Updated**: 2026-05-09  
-**Status**: Ready for Testing ✅
+**Status**: Ready for Testing 

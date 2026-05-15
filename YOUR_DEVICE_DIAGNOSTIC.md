@@ -2,14 +2,14 @@
 
 ## Your Device Details (Confirmed via nRF Connect)
 - **Device Name:** FORA02
-- **MAC Address:** C0:26:DA:17:D5:7D ✓ (Matches app configuration)
-- **Connection:** Works in nRF Connect ✓
-- **Bonding:** BONDED ✓
+- **MAC Address:** C0:26:DA:17:D5:7D  (Matches app configuration)
+- **Connection:** Works in nRF Connect 
+- **Bonding:** BONDED 
 
 ## App Configuration Status
-✓ MAC address matches: `C0:26:DA:17:D5:7D` is in `KnownDevices.kt`
-✓ Device name "FORA02" contains "O2" - should be detected
-✓ Device can connect (proven by nRF Connect)
+ MAC address matches: `C0:26:DA:17:D5:7D` is in `KnownDevices.kt`
+ Device name "FORA02" contains "O2" - should be detected
+ Device can connect (proven by nRF Connect)
 
 ## Why It's Not Working in the App
 

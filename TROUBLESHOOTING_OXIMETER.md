@@ -98,7 +98,7 @@ To see what's happening, enable Android logging:
    - `BLE_MATCH: ... matched` - Target device found
    - `BLE_CONNECT: Connecting to ...` - Connection attempt
    - `BLE_CONNECT: Connected to ...` - Connection successful
-   - `BLE_SPO2: ✓ Valid reading: SpO2=...` - Data received
+   - `BLE_SPO2:  Valid reading: SpO2=...` - Data received
 
 ## Common Issues and Solutions
 

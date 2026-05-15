@@ -2,8 +2,8 @@
 
 ## Problem
 Your current DataStore has the wrong Diastolic UID:
-- **Current**: `skBarAsIYIL` ❌
-- **Correct**: `BaGxiB8AsNI` ✅
+- **Current**: `skBarAsIYIL` 
+- **Correct**: `BaGxiB8AsNI` 
 
 ## Solution: Update DataStore Configuration
 
@@ -17,7 +17,7 @@ fetch('/api/dataStore/sensorConfig/config', {
 })
 .then(response => {
   if (response.ok) {
-    console.log('✓ Old configuration deleted');
+    console.log(' Old configuration deleted');
   } else {
     console.log('Configuration not found or already deleted');
   }
@@ -99,7 +99,7 @@ fetch('/api/dataStore/sensorConfig/config', {
   })
 })
 .then(response => response.json())
-.then(data => console.log('✓ Configuration updated:', data))
+.then(data => console.log(' Configuration updated:', data))
 .catch(error => console.error('Error:', error));
 ```
 
@@ -115,7 +115,7 @@ fetch('/api/dataStore/sensorConfig/config')
     // Check BP sensor specifically
     const bpSensor = data.sensors.find(s => s.name === 'Blood Pressure');
     if (bpSensor) {
-      console.log('\n✓ BP Sensor found:');
+      console.log('\n BP Sensor found:');
       console.log('  Systolic UID:', bpSensor.measurements.systolic.dataElement);
       console.log('  Diastolic UID:', bpSensor.measurements.diastolic.dataElement);
       console.log('  Pulse UID:', bpSensor.measurements.pulse.dataElement);
@@ -139,11 +139,11 @@ fetch('/api/dataStore/sensorConfig/config')
    - Connect BP sensor
    - Check logs for:
      ```
-     SENSOR_DATA: Sensor config found: Blood Pressure ✅
-     SENSOR_DATA: isMultiMeasurement: true ✅
-     SENSOR_DATA: Mapping SYSTOLIC → HkfzcXMdLLF ✅
-     SENSOR_DATA: Mapping DIASTOLIC → BaGxiB8AsNI ✅
-     SENSOR_DATA: Mapping PULSE → S7OjKl85YSh ✅
+     SENSOR_DATA: Sensor config found: Blood Pressure 
+     SENSOR_DATA: isMultiMeasurement: true 
+     SENSOR_DATA: Mapping SYSTOLIC → HkfzcXMdLLF 
+     SENSOR_DATA: Mapping DIASTOLIC → BaGxiB8AsNI 
+     SENSOR_DATA: Mapping PULSE → S7OjKl85YSh 
      ```
 
 ## Expected Result
@@ -156,9 +156,9 @@ After updating DataStore and clearing app cache:
 - PULSE = 60
 
 **App saves to:**
-- Systolic Pressure (HkfzcXMdLLF) = 99 ✅
-- Diastolic Pressure (BaGxiB8AsNI) = 82 ✅
-- Heart Rate (S7OjKl85YSh) = 60 ✅
+- Systolic Pressure (HkfzcXMdLLF) = 99 
+- Diastolic Pressure (BaGxiB8AsNI) = 82 
+- Heart Rate (S7OjKl85YSh) = 60 
 
 ## Troubleshooting
 

@@ -1,10 +1,10 @@
-# 🔧 Rebuild App with Enhanced Logging
+#  Rebuild App with Enhanced Logging
 
 ## What I Did
 
 I added **detailed logging** to the sensor config loading code so we can see exactly what's happening when the app tries to load your DataStore configuration.
 
-## 🚀 Next Steps
+##  Next Steps
 
 ### Step 1: Rebuild the App
 
@@ -41,8 +41,8 @@ SensorConfigApi: Querying DataStore: namespace='sensor-config', key='vital-senso
 1. Go to **Settings** → **Sync metadata**
 2. **Watch the logs** during sync
 3. Look for:
-   - `SensorConfig: ✓ Loaded sensors: 3` (SUCCESS)
-   - OR `SensorConfigApi: ❌ No DataStore entry found!` (FAILURE)
+   - `SensorConfig:  Loaded sensors: 3` (SUCCESS)
+   - OR `SensorConfigApi:  No DataStore entry found!` (FAILURE)
 
 ### Step 5: Test BP Sensor
 
@@ -51,10 +51,10 @@ SensorConfigApi: Querying DataStore: namespace='sensor-config', key='vital-senso
 3. Connect BP sensor
 4. **Check logs** for:
    ```
-   SENSOR_DATA: Sensor config found: Blood Pressure ✅
+   SENSOR_DATA: Sensor config found: Blood Pressure 
    ```
 
-## 📊 What the Logs Will Tell Us
+##  What the Logs Will Tell Us
 
 ### If DataStore is Loading Successfully:
 
@@ -62,9 +62,9 @@ SensorConfigApi: Querying DataStore: namespace='sensor-config', key='vital-senso
 SensorConfig: === fetchSensorConfig() called ===
 SensorConfigApi: === getSensorConfig() called ===
 SensorConfigApi: DataStore query returned 1 entries
-SensorConfigApi: ✓ Found DataStore entry (XXX chars)
-SensorConfigApi: ✓ Successfully parsed 3 sensors
-SensorConfig: ✓ Loaded sensors: 3
+SensorConfigApi:  Found DataStore entry (XXX chars)
+SensorConfigApi:  Successfully parsed 3 sensors
+SensorConfig:  Loaded sensors: 3
 SensorConfig:   - Temperature
 SensorConfig:   - Pulse Oximeter
 SensorConfig:   - Blood Pressure
@@ -73,8 +73,8 @@ SensorConfig: === Config loaded successfully ===
 
 **Then when you test BP sensor:**
 ```
-SENSOR_DATA: Sensor config found: Blood Pressure ✅
-SENSOR_DATA: isMultiMeasurement: true ✅
+SENSOR_DATA: Sensor config found: Blood Pressure 
+SENSOR_DATA: isMultiMeasurement: true 
 SENSOR_DATA: Mapping SYSTOLIC → HkfzcXMdLLF
 SENSOR_DATA: Mapping DIASTOLIC → BaGxiB8AsNI
 SENSOR_DATA: Mapping PULSE → S7OjKl85YSh
@@ -85,12 +85,12 @@ SENSOR_DATA: Mapping PULSE → S7OjKl85YSh
 ```
 SensorConfig: === fetchSensorConfig() called ===
 SensorConfigApi: === getSensorConfig() called ===
-SensorConfigApi: DataStore query returned 0 entries ❌
-SensorConfigApi: ❌ No DataStore entry found!
+SensorConfigApi: DataStore query returned 0 entries 
+SensorConfigApi:  No DataStore entry found!
 SensorConfigApi: Make sure you have created the DataStore entry:
 SensorConfigApi:   Namespace: sensor-config
 SensorConfigApi:   Key: vital-sensor-mapping
-SensorConfig: ❌ Fetch failed! Error: Config not found in DataStore
+SensorConfig:  Fetch failed! Error: Config not found in DataStore
 ```
 
 **This means:**
@@ -98,7 +98,7 @@ SensorConfig: ❌ Fetch failed! Error: Config not found in DataStore
 - OR the namespace/key is wrong
 - OR the app doesn't have permission to access it
 
-## 🔍 Possible Issues and Solutions
+##  Possible Issues and Solutions
 
 ### Issue 1: DataStore Entry Doesn't Exist
 
@@ -129,7 +129,7 @@ This lists all namespaces. Find yours and verify the key.
 2. Check DHIS2 server is accessible
 3. Try manual sync: Settings → Sync metadata
 
-## 📝 What to Share
+##  What to Share
 
 After rebuilding and testing, share these logs:
 
@@ -139,13 +139,13 @@ After rebuilding and testing, share these logs:
 
 This will tell us exactly why the DataStore isn't loading!
 
-## 🎯 Expected Outcome
+##  Expected Outcome
 
 After rebuilding with enhanced logging, we'll be able to see:
-- ✅ Is `fetchSensorConfig()` being called?
-- ✅ Is the DataStore query returning results?
-- ✅ Is the JSON parsing successfully?
-- ✅ Are the sensors being loaded into memory?
+-  Is `fetchSensorConfig()` being called?
+-  Is the DataStore query returning results?
+-  Is the JSON parsing successfully?
+-  Are the sensors being loaded into memory?
 
 Then we can fix the exact issue preventing the config from loading!
 
