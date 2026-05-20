@@ -103,3 +103,11 @@ Planned improvements include:
 - Lexah Mbale
 - Shadreck Mkandawire
 - Lusungu Mhango
+
+---
+
+## Supervisors
+
+- Dr. Tiwonge Manda
+- Mr. Peter Isulu
+- Mr. Mathews Jere
