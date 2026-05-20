@@ -15,9 +15,7 @@ The project currently supports Bluetooth Low Energy (BLE) medical sensors includ
 
 The architecture is also being prepared for future support of:
 
-- Wi-Fi based sensors
-- USB medical devices
-- Additional BLE sensors such as SpO₂, glucose meters, heart rate monitors, and weight scales
+- Additional BLE sensors such as heart rate monitors and weight scales
 
 The main goal of the project is to improve healthcare data collection by reducing manual data entry,
 improving accuracy, and enabling direct sensor-to-DHIS2 integration.
@@ -34,6 +32,11 @@ improving accuracy, and enabling direct sensor-to-DHIS2 integration.
 - Manual fallback entry when sensors are unavailable
 - Modular sensor architecture for future scalability
 - Support for configurable sensor settings using datastore configuration
+- Automatic sensor reconnection
+- Vital signs dashboard
+- Multi-sensor management
+- Support for Wi-Fi and USB medical devices
+- Offline synchronization improvements
 
 ---
 
@@ -75,12 +78,7 @@ integrations.
 
 Planned improvements include:
 
-- Automatic sensor reconnection
 - Real-time vital sign validation
-- Vital signs dashboard
-- Multi-sensor management
-- Support for Wi-Fi and USB medical devices
-- Offline synchronization improvements
 - Advanced analytics and reporting
 - Modular sensor expansion
 
