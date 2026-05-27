@@ -217,7 +217,8 @@ data class PatientVitalSummary(
     val gender: String?,
     val latestVitals: Map<VitalSignType, VitalValue>,
     val hasAlerts: Boolean,
-    val lastMeasurementTime: Long
+    val lastMeasurementTime: Long,
+    val lastUpdatedTime: Long,
 )
 
 /**
@@ -232,6 +233,7 @@ data class VitalMeasurement(
     val measurementKind: VitalMeasurementKind,
     val value: VitalValue,
     val timestamp: Long,
+    val lastUpdatedTimestamp: Long,
     val isAbnormal: Boolean,
     val notes: String?
 )
@@ -241,6 +243,7 @@ data class RecentVitalReading(
     val patientUid: String,
     val patientName: String,
     val timestamp: Long,
+    val lastUpdatedTimestamp: Long,
     val values: Map<VitalSignType, VitalValue>,
     val hasAlerts: Boolean,
 )

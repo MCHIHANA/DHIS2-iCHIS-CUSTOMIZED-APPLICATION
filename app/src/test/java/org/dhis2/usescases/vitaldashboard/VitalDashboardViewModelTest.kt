@@ -61,9 +61,10 @@ class VitalDashboardViewModelTest {
                             latestVitals =
                                 mapOf(
                                     VitalSignType.TEMPERATURE to VitalValue("37.1", "C", 37.1f),
-                                ),
+                            ),
                             hasAlerts = false,
                             lastMeasurementTime = 1L,
+                            lastUpdatedTime = 1L,
                         ),
                     ),
                 recentMeasurements = emptyList(),

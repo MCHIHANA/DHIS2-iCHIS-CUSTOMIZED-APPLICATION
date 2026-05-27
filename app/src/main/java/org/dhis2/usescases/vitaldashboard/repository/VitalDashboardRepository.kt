@@ -196,6 +196,7 @@ class VitalDashboardRepository(
                         measurementKind = definition.measurementKind,
                         value = value,
                         timestamp = event.eventDate()?.time ?: event.created()?.time ?: System.currentTimeMillis(),
+                        lastUpdatedTimestamp = event.lastUpdated()?.time ?: event.created()?.time ?: event.eventDate()?.time ?: System.currentTimeMillis(),
                         isAbnormal = isValueAbnormal(value, definition.measurementKind),
                         notes = null,
                     ),
@@ -234,6 +235,7 @@ class VitalDashboardRepository(
                     latestVitals = buildVitalValueMap(patientMeasurements),
                     hasAlerts = patientMeasurements.any { it.isAbnormal },
                     lastMeasurementTime = patientMeasurements.maxOfOrNull { it.timestamp } ?: System.currentTimeMillis(),
+                    lastUpdatedTime = patientMeasurements.maxOfOrNull { it.lastUpdatedTimestamp } ?: System.currentTimeMillis(),
                 )
             }.sortedByDescending { it.lastMeasurementTime }
 
@@ -247,6 +249,7 @@ class VitalDashboardRepository(
                     patientUid = latestMeasurement.patientUid,
                     patientName = latestMeasurement.patientName,
                     timestamp = latestMeasurement.timestamp,
+                    lastUpdatedTimestamp = eventMeasurements.maxOfOrNull { it.lastUpdatedTimestamp } ?: latestMeasurement.timestamp,
                     values = buildVitalValueMap(eventMeasurements),
                     hasAlerts = eventMeasurements.any { it.isAbnormal },
                 )
