@@ -99,7 +99,23 @@ class BleManager(
         device: BluetoothDevice,
         sensorType: SensorType = SensorType.UNKNOWN,
     ) {
-        stopScan()
+        connectDeviceInternal(
+            device = device,
+            sensorType = sensorType,
+            clearPendingReconnect = true,
+        )
+    }
+
+    private fun connectDeviceInternal(
+        device: BluetoothDevice,
+        sensorType: SensorType = SensorType.UNKNOWN,
+        clearPendingReconnect: Boolean,
+    ) {
+        if (clearPendingReconnect) {
+            stopScan()
+        } else {
+            bleScanner.stopScan()
+        }
         isConnecting = true
         currentDevice = device
         _currentDeviceAddress.value = device.address.uppercase()
@@ -124,7 +140,11 @@ class BleManager(
         val resolvedSensorType = resolveSensorType(device, sensorType)
         SensorLogger.d(TAG, "Attempting direct reconnect to $address (type=$resolvedSensorType)")
         pendingDirectReconnect = DirectReconnectRequest(address.uppercase(), resolvedSensorType)
-        connectDevice(device, resolvedSensorType)
+        connectDeviceInternal(
+            device = device,
+            sensorType = resolvedSensorType,
+            clearPendingReconnect = false,
+        )
         scheduleDirectReconnectFallback()
         return true
     }
