@@ -26,7 +26,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -49,6 +48,8 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import org.dhis2.form.R
 import org.dhis2.form.ui.FormViewModel
+import org.dhis2.form.ui.sensor.SensorFieldResolver
+import org.dhis2.form.ui.sensor.SensorStatusText
 import org.hisp.dhis.mobile.ui.designsystem.component.BottomSheetShell
 import org.hisp.dhis.mobile.ui.designsystem.component.Button
 import org.hisp.dhis.mobile.ui.designsystem.component.ProgressIndicator
@@ -59,21 +60,19 @@ import org.hisp.dhis.mobile.ui.designsystem.theme.Spacing
 
 const val SENSOR_DIALOG_TAG = "SensorConnectionBottomSheet"
 
-/** Permissions required for BLE scanning. Android 12+ needs BLUETOOTH_SCAN/CONNECT;
- *  older versions need ACCESS_FINE_LOCATION. */
-private val BLE_PERMISSIONS = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-    arrayOf(
-        Manifest.permission.BLUETOOTH_SCAN,
-        Manifest.permission.BLUETOOTH_CONNECT,
-    )
-} else {
-    arrayOf(Manifest.permission.ACCESS_FINE_LOCATION)
-}
+private val BLE_PERMISSIONS =
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+        arrayOf(
+            Manifest.permission.BLUETOOTH_SCAN,
+            Manifest.permission.BLUETOOTH_CONNECT,
+        )
+    } else {
+        arrayOf(Manifest.permission.ACCESS_FINE_LOCATION)
+    }
 
 class SensorConnectionBottomSheet(
     private val fieldUid: String,
     private val viewModel: FormViewModel,
-    /** For multi-value sensors (oximeter): UID of the second field to fill. */
     private val secondaryFieldUid: String? = null,
 ) : DialogFragment() {
 
@@ -88,23 +87,24 @@ class SensorConnectionBottomSheet(
         inflater: LayoutInflater,
         container: ViewGroup?,
         savedInstanceState: Bundle?,
-    ): View = ComposeView(requireContext()).apply {
-        Log.d("SensorBottomSheet", "Opening Bluetooth sensor dialog for field: $fieldUid")
-        setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnViewTreeLifecycleDestroyed)
-        setContent {
-            DHIS2Theme {
-                SensorConnectionScreen(
-                    fieldUid = fieldUid,
-                    secondaryFieldUid = secondaryFieldUid,
-                    viewModel = viewModel,
-                    onDismiss = {
-                        Log.d("SensorBottomSheet", "Closing dialog")
-                        dismissAllowingStateLoss()
-                    },
-                )
+    ): View =
+        ComposeView(requireContext()).apply {
+            Log.d("SensorBottomSheet", "Opening Bluetooth sensor dialog for field: $fieldUid")
+            setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnViewTreeLifecycleDestroyed)
+            setContent {
+                DHIS2Theme {
+                    SensorConnectionScreen(
+                        fieldUid = fieldUid,
+                        secondaryFieldUid = secondaryFieldUid,
+                        viewModel = viewModel,
+                        onDismiss = {
+                            Log.d("SensorBottomSheet", "Closing dialog")
+                            dismissAllowingStateLoss()
+                        },
+                    )
+                }
             }
         }
-    }
 
     fun show(manager: FragmentManager) {
         super.show(manager, SENSOR_DIALOG_TAG)
@@ -123,17 +123,32 @@ fun SensorConnectionScreen(
     val isScanningMap by viewModel.isFieldScanning.collectAsState()
     val isScanning = isScanningMap[fieldUid] ?: false
     val sensorStatuses by viewModel.sensorStatuses.collectAsState()
-    val status = sensorStatuses[fieldUid] ?: "Initializing..."
+    val status = sensorStatuses[fieldUid] ?: SensorStatusText.WAITING_FOR_DATA
+    val secondaryStatus = secondaryFieldUid?.let { sensorStatuses[it] }.orEmpty()
+    val displayStatus =
+        status.takeIf { SensorFieldResolver.hasCompletedReading(it) }
+            ?: secondaryStatus.takeIf { SensorFieldResolver.hasCompletedReading(it) }
+            ?: status
+    val hasReading =
+        SensorFieldResolver.hasCompletedReading(status) ||
+            SensorFieldResolver.hasCompletedReading(secondaryStatus)
 
     var permissionDenied by remember { mutableStateOf(false) }
     var scanStartTime by remember { mutableStateOf(0L) }
 
-    // Request BLE permissions then start scan
+    val closeSheet: () -> Unit = {
+        coroutineScope.launch {
+            viewModel.stopSensorScan()
+            delay(100)
+            onDismiss()
+        }
+    }
+
     val permissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions(),
     ) { results ->
         if (results.values.all { it }) {
-            Log.d("SensorBottomSheet", "BLE permissions granted — starting scan")
+            Log.d("SensorBottomSheet", "BLE permissions granted - starting scan")
             scanStartTime = System.currentTimeMillis()
             viewModel.startSensorScan(fieldUid, secondaryFieldUid)
         } else {
@@ -142,12 +157,12 @@ fun SensorConnectionScreen(
         }
     }
 
-    // Check permissions and start scan immediately when dialog opens
-    LaunchedEffect(Unit) {
+    androidx.compose.runtime.LaunchedEffect(Unit) {
         Log.d("SensorBottomSheet", "Auto-starting BLE scan for field: $fieldUid")
-        val allGranted = BLE_PERMISSIONS.all {
-            ContextCompat.checkSelfPermission(context, it) == PackageManager.PERMISSION_GRANTED
-        }
+        val allGranted =
+            BLE_PERMISSIONS.all {
+                ContextCompat.checkSelfPermission(context, it) == PackageManager.PERMISSION_GRANTED
+            }
         if (allGranted) {
             scanStartTime = System.currentTimeMillis()
             viewModel.startSensorScan(fieldUid, secondaryFieldUid)
@@ -156,93 +171,109 @@ fun SensorConnectionScreen(
         }
     }
 
-    // Show timeout message after 30 seconds
-    LaunchedEffect(isScanning) {
+    androidx.compose.runtime.LaunchedEffect(isScanning, scanStartTime) {
         if (isScanning && scanStartTime > 0) {
-            delay(30000) // 30 seconds
+            delay(30_000)
             if (isScanning) {
                 Log.w("SensorBottomSheet", "Scan timeout after 30 seconds")
             }
         }
     }
 
-    // Auto-dismiss once data is received on either field
-    val secondaryStatuses by viewModel.sensorStatuses.collectAsState()
-    val secondaryStatus = if (secondaryFieldUid != null) secondaryStatuses[secondaryFieldUid] ?: "" else ""
-
-    LaunchedEffect(status, secondaryStatus) {
-        if (status.startsWith("Data received") ||
-            (secondaryFieldUid != null && secondaryStatus.startsWith("Data received"))
-        ) {
-            Log.d("SensorBottomSheet", "Data received — dismissing")
-            delay(1200)
-            onDismiss()
-        }
-    }
-
     BottomSheetShell(
-        uiState = BottomSheetShellUIState(
-            title = "Bluetooth Sensor",
-            showTopSectionDivider = true,
-        ),
-        onDismiss = {
-            coroutineScope.launch {
-                viewModel.stopSensorScan()
-                delay(100)
-                onDismiss()
-            }
-        },
+        uiState =
+            BottomSheetShellUIState(
+                title = "Bluetooth Sensor",
+                showTopSectionDivider = true,
+            ),
+        onDismiss = closeSheet,
         content = {
             Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(Spacing.Spacing16),
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .padding(Spacing.Spacing16),
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
                 when {
-                    permissionDenied -> BluetoothSensorStatus(
-                        status = "Bluetooth permission denied.\nPlease grant it in Settings.",
-                        isSuccess = false,
-                    )
-                    status.startsWith("Data received") -> BluetoothSensorStatus(
-                        status = status,
-                        isSuccess = true,
-                    )
-                    status == "No connections available" -> BluetoothSensorStatus(
-                        status = "No sensor found. Try again.",
-                        isSuccess = false,
-                    )
-                    status.contains("Place finger", ignoreCase = true) -> BluetoothSensorPlaceFinger(status)
-                    status.contains("Connecting", ignoreCase = true) -> BluetoothSensorConnecting(status)
-                    status.contains("Scanning", ignoreCase = true) || 
-                    status.contains("Waiting", ignoreCase = true) ||
-                    status.contains("Initializing", ignoreCase = true) -> BluetoothSensorSearching(status)
-                    else -> BluetoothSensorSearching(status)
+                    permissionDenied ->
+                        BluetoothSensorStatus(
+                            status = "Bluetooth permission denied.\nPlease grant it in Settings.",
+                            isSuccess = false,
+                        )
+
+                    hasReading ->
+                        BluetoothSensorSuccess(
+                            status = displayStatus,
+                            helperText = SensorStatusText.RETAKE_HINT,
+                        )
+
+                    displayStatus == "No connections available" ->
+                        BluetoothSensorStatus(
+                            status = SensorStatusText.NO_SENSOR_FOUND,
+                            isSuccess = false,
+                        )
+
+                    displayStatus.contains("connecting", ignoreCase = true) ->
+                        BluetoothSensorConnecting(
+                            statusMessage = SensorStatusText.DIRECT_CONNECTING,
+                            helperText = SensorStatusText.WAITING_FOR_DATA,
+                        )
+
+                    displayStatus.contains("connected", ignoreCase = true) ->
+                        BluetoothSensorConnecting(
+                            statusMessage = SensorStatusText.CONNECTED,
+                            helperText = SensorStatusText.WAITING_FOR_DATA,
+                        )
+
+                    displayStatus.contains("search", ignoreCase = true) ||
+                        displayStatus.contains("scan", ignoreCase = true) ||
+                        displayStatus.contains("waiting", ignoreCase = true) ||
+                        displayStatus.contains("initializing", ignoreCase = true) ->
+                        BluetoothSensorSearching(displayStatus)
+
+                    else ->
+                        BluetoothSensorSearching(displayStatus)
                 }
             }
         },
         buttonBlock = {
-            Button(
+            Column(
                 modifier = Modifier.fillMaxWidth(),
-                text = "CANCEL",
-                onClick = {
-                    coroutineScope.launch {
-                        viewModel.stopSensorScan()
-                        delay(100)
-                        onDismiss()
-                    }
-                },
-            )
+                verticalArrangement = Arrangement.spacedBy(Spacing.Spacing8),
+            ) {
+                if (hasReading) {
+                    Button(
+                        modifier = Modifier.fillMaxWidth(),
+                        text = "RETAKE MEASUREMENT",
+                        onClick = {
+                            viewModel.retakeSensorMeasurement(fieldUid, secondaryFieldUid)
+                        },
+                    )
+                    Button(
+                        modifier = Modifier.fillMaxWidth(),
+                        text = "DONE",
+                        onClick = closeSheet,
+                    )
+                } else {
+                    Button(
+                        modifier = Modifier.fillMaxWidth(),
+                        text = "CANCEL",
+                        onClick = closeSheet,
+                    )
+                }
+            }
         },
     )
 }
 
 @Composable
-private fun BluetoothSensorSearching(statusMessage: String = "Waiting for sensor...") {
+private fun BluetoothSensorSearching(statusMessage: String = SensorStatusText.SCANNING) {
     Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = Spacing.Spacing16),
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .padding(vertical = Spacing.Spacing16),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
     ) {
@@ -271,11 +302,15 @@ private fun BluetoothSensorSearching(statusMessage: String = "Waiting for sensor
 }
 
 @Composable
-private fun BluetoothSensorConnecting(statusMessage: String = "Connecting...") {
+private fun BluetoothSensorConnecting(
+    statusMessage: String,
+    helperText: String,
+) {
     Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = Spacing.Spacing16),
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .padding(vertical = Spacing.Spacing16),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
     ) {
@@ -285,37 +320,9 @@ private fun BluetoothSensorConnecting(statusMessage: String = "Connecting...") {
             fontWeight = FontWeight.Bold,
             style = MaterialTheme.typography.bodyLarge,
         )
-        Spacer(modifier = Modifier.height(Spacing.Spacing16))
-        ProgressIndicator(type = ProgressIndicatorType.CIRCULAR_SMALL)
-    }
-}
-
-@Composable
-private fun BluetoothSensorPlaceFinger(statusMessage: String = "Place finger on sensor") {
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = Spacing.Spacing16),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center,
-    ) {
-        Icon(
-            painter = painterResource(id = R.drawable.ic_bluetooth),
-            contentDescription = null,
-            modifier = Modifier.size(Spacing.Spacing48),
-            tint = Color(0xFF4CAF50), // Green to indicate ready
-        )
         Spacer(modifier = Modifier.height(Spacing.Spacing8))
         Text(
-            text = statusMessage,
-            fontSize = 18.sp,
-            fontWeight = FontWeight.Bold,
-            style = MaterialTheme.typography.bodyLarge,
-            color = Color(0xFF4CAF50),
-        )
-        Spacer(modifier = Modifier.height(Spacing.Spacing8))
-        Text(
-            text = "Waiting for reading...",
+            text = helperText,
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
@@ -325,11 +332,39 @@ private fun BluetoothSensorPlaceFinger(statusMessage: String = "Place finger on 
 }
 
 @Composable
+private fun BluetoothSensorSuccess(
+    status: String,
+    helperText: String,
+) {
+    Column(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .padding(vertical = Spacing.Spacing16),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Text(
+            text = status,
+            style = MaterialTheme.typography.bodyLarge,
+            fontWeight = FontWeight.Medium,
+            color = Color(0xFF4CAF50),
+        )
+        Spacer(modifier = Modifier.height(Spacing.Spacing8))
+        Text(
+            text = helperText,
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
+}
+
+@Composable
 private fun BluetoothSensorStatus(status: String, isSuccess: Boolean) {
     Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = Spacing.Spacing16),
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .padding(vertical = Spacing.Spacing16),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         Text(
@@ -345,10 +380,11 @@ private fun BluetoothSensorStatus(status: String, isSuccess: Boolean) {
 @Composable
 fun DeviceRow(device: BluetoothDevice, onClick: () -> Unit) {
     Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable(onClick = onClick)
-            .padding(vertical = Spacing.Spacing8),
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .clickable(onClick = onClick)
+                .padding(vertical = Spacing.Spacing8),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Icon(
