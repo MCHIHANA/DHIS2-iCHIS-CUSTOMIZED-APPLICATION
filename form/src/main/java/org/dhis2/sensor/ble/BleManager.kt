@@ -40,8 +40,11 @@ class BleManager(
             .launchIn(scope)
     }
 
-    fun startScan() {
-        delegate.startScan()
+    fun startScan(
+        preferredDeviceAddress: String? = null,
+        sensorType: SensorType = SensorType.UNKNOWN,
+    ) {
+        delegate.startScan(preferredDeviceAddress, sensorType)
     }
 
     fun stopScan() {

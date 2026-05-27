@@ -27,6 +27,7 @@ class BleScanner(
     private var scanCallback: ScanCallback? = null
 
     fun startScan(
+        preferredTargetAddress: String? = null,
         onDeviceFound: (BluetoothDevice) -> Unit,
         onTargetFound: ((BluetoothDevice) -> Unit)? = null,
         onAdvertisementTemperature: ((Double) -> Unit)? = null,
@@ -66,6 +67,15 @@ class BleScanner(
                     val services = result.scanRecord?.serviceUuids?.joinToString { it.uuid.toString() } ?: "none"
                     SensorLogger.d("BLE_DEVICE", "Found: name='$name' mac=$address services=[$services]")
                     onDeviceFound(device)
+                }
+
+                if (preferredTargetAddress != null &&
+                    address.equals(preferredTargetAddress, ignoreCase = true)
+                ) {
+                    SensorLogger.d("BLE_MATCH", "Preferred MAC matched during fallback scan: $address")
+                    stopScan()
+                    onTargetFound?.invoke(device)
+                    return
                 }
 
                 if (SensorRegistry.knownDeviceAddresses.contains(address.uppercase())) {
@@ -134,6 +144,14 @@ class BleScanner(
             SensorLogger.d(TAG, "Scan stopped")
         }
     }
+
+    fun getRemoteDevice(address: String): BluetoothDevice? =
+        try {
+            bluetoothAdapter?.getRemoteDevice(address)
+        } catch (exception: IllegalArgumentException) {
+            SensorLogger.e(TAG, "Invalid Bluetooth device address: $address", exception)
+            null
+        }
 
     private companion object {
         const val TAG = "BLE_SCAN"

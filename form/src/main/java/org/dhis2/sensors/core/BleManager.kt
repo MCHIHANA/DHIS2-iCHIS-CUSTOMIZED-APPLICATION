@@ -2,18 +2,36 @@ package org.dhis2.sensors.core
 
 import android.bluetooth.BluetoothDevice
 import android.content.Context
-import org.dhis2.sensors.utils.SensorLogger
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.launch
+import org.dhis2.sensors.utils.SensorLogger
 
 class BleManager(
     private val context: Context,
 ) {
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private val bleScanner = BleScanner(context)
+    private val deviceCache = BleDeviceCache(context)
     private val bleConnector = BleConnector(
         onConnectionStateChanged = { isConnected ->
             _connectionState.value = if (isConnected) ConnectionState.CONNECTED else ConnectionState.DISCONNECTED
+            if (isConnected) {
+                directReconnectJob?.cancel()
+                currentDevice?.let { device ->
+                    deviceCache.put(currentSensorType, device.address)
+                }
+                pendingDirectReconnect = null
+            } else if (pendingDirectReconnect != null) {
+                fallbackToDiscoveryScan("direct connection closed before data session")
+            }
+
             if (!isConnected) {
                 isConnecting = false
             }
@@ -27,6 +45,10 @@ class BleManager(
 
     @Volatile
     private var isConnecting = false
+    private var currentSensorType: SensorType = SensorType.UNKNOWN
+    private var currentDevice: BluetoothDevice? = null
+    private var pendingDirectReconnect: DirectReconnectRequest? = null
+    private var directReconnectJob: Job? = null
 
     private val _devices = MutableStateFlow<List<BluetoothDevice>>(emptyList())
     val devices: StateFlow<List<BluetoothDevice>> = _devices.asStateFlow()
@@ -37,11 +59,102 @@ class BleManager(
     private val _sensorData = MutableStateFlow<List<SensorReading>>(emptyList())
     val sensorData: StateFlow<List<SensorReading>> = _sensorData.asStateFlow()
 
-    fun startScan() {
+    fun startScan(
+        preferredDeviceAddress: String? = null,
+        preferredSensorType: SensorType = SensorType.UNKNOWN,
+    ) {
         _devices.value = emptyList()
+        _sensorData.value = emptyList()
         isConnecting = false
-        SensorLogger.d(TAG, "Starting BLE scan")
+        currentSensorType = preferredSensorType
+        SensorLogger.d(TAG, "Starting BLE workflow (preferredMac=$preferredDeviceAddress, sensorType=$preferredSensorType)")
+
+        val cachedAddress =
+            preferredDeviceAddress?.uppercase()
+                ?: deviceCache.get(preferredSensorType)
+
+        if (cachedAddress != null && tryDirectReconnect(cachedAddress, preferredSensorType)) {
+            return
+        }
+
+        startDiscoveryScan(
+            preferredAddress = cachedAddress,
+            preferredSensorType = preferredSensorType,
+        )
+    }
+
+    fun stopScan() {
+        bleScanner.stopScan()
+        directReconnectJob?.cancel()
+        pendingDirectReconnect = null
+    }
+
+    fun connectDevice(
+        device: BluetoothDevice,
+        sensorType: SensorType = SensorType.UNKNOWN,
+    ) {
+        stopScan()
+        isConnecting = true
+        currentDevice = device
+        currentSensorType = resolveSensorType(device, sensorType)
+        _connectionState.value = ConnectionState.CONNECTING
+        bleConnector.connect(context, device, currentSensorType)
+    }
+
+    fun disconnect() {
+        isConnecting = false
+        directReconnectJob?.cancel()
+        pendingDirectReconnect = null
+        bleConnector.disconnect()
+    }
+
+    private fun tryDirectReconnect(
+        address: String,
+        sensorType: SensorType,
+    ): Boolean {
+        val device = bleScanner.getRemoteDevice(address) ?: return false
+        val resolvedSensorType = resolveSensorType(device, sensorType)
+        SensorLogger.d(TAG, "Attempting direct reconnect to $address (type=$resolvedSensorType)")
+        pendingDirectReconnect = DirectReconnectRequest(address.uppercase(), resolvedSensorType)
+        connectDevice(device, resolvedSensorType)
+        scheduleDirectReconnectFallback()
+        return true
+    }
+
+    private fun scheduleDirectReconnectFallback() {
+        directReconnectJob?.cancel()
+        directReconnectJob =
+            scope.launch {
+                delay(DIRECT_RECONNECT_TIMEOUT_MS)
+                if (pendingDirectReconnect != null &&
+                    _connectionState.value != ConnectionState.CONNECTED
+                ) {
+                    fallbackToDiscoveryScan("direct reconnect timed out")
+                }
+            }
+    }
+
+    private fun fallbackToDiscoveryScan(reason: String) {
+        val reconnectRequest = pendingDirectReconnect ?: return
+        SensorLogger.w(TAG, "Falling back to BLE scan for ${reconnectRequest.address}: $reason")
+        directReconnectJob?.cancel()
+        pendingDirectReconnect = null
+        bleConnector.disconnect()
+        startDiscoveryScan(
+            preferredAddress = reconnectRequest.address,
+            preferredSensorType = reconnectRequest.sensorType,
+        )
+    }
+
+    private fun startDiscoveryScan(
+        preferredAddress: String?,
+        preferredSensorType: SensorType,
+    ) {
+        isConnecting = false
+        _connectionState.value = ConnectionState.DISCONNECTED
+        SensorLogger.d(TAG, "Starting BLE discovery scan")
         bleScanner.startScan(
+            preferredTargetAddress = preferredAddress,
             onDeviceFound = { device ->
                 val currentDevices = _devices.value.toMutableList()
                 if (!currentDevices.contains(device)) {
@@ -56,30 +169,18 @@ class BleManager(
                     return@startScan
                 }
                 isConnecting = true
-                val sensorType = SensorRegistry.getSensorType(device.address)
+                val sensorType = resolveSensorType(device, preferredSensorType)
                 SensorLogger.d(TAG, "Target sensor found: $sensorType (${device.address})")
                 connectDevice(device, sensorType)
             },
         )
     }
 
-    fun stopScan() {
-        bleScanner.stopScan()
-    }
-
-    fun connectDevice(
+    private fun resolveSensorType(
         device: BluetoothDevice,
-        sensorType: SensorType = SensorType.UNKNOWN,
-    ) {
-        stopScan()
-        _connectionState.value = ConnectionState.CONNECTING
-        bleConnector.connect(context, device, sensorType)
-    }
-
-    fun disconnect() {
-        isConnecting = false
-        bleConnector.disconnect()
-    }
+        fallbackSensorType: SensorType,
+    ): SensorType =
+        SensorRegistry.getSensorType(device.address).takeIf { it != SensorType.UNKNOWN } ?: fallbackSensorType
 
     enum class ConnectionState {
         DISCONNECTED,
@@ -88,7 +189,13 @@ class BleManager(
         DISCONNECTING,
     }
 
+    private data class DirectReconnectRequest(
+        val address: String,
+        val sensorType: SensorType,
+    )
+
     private companion object {
         const val TAG = "BleManager"
+        const val DIRECT_RECONNECT_TIMEOUT_MS = 8_000L
     }
 }
