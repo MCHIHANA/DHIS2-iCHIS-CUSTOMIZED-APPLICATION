@@ -27,6 +27,8 @@ import org.dhis2.commons.vitals.RefreshSource
 import org.dhis2.commons.vitals.VitalDashboardRefreshBus
 import org.dhis2.commons.vitals.VitalDashboardRefreshEvent
 import org.dhis2.form.ui.sensor.SensorConnectionManager
+import org.dhis2.form.ui.sensor.SensorFieldResolver
+import org.dhis2.form.ui.sensor.SensorStatusText
 import org.dhis2.form.ui.SensorType
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.launch
@@ -224,7 +226,7 @@ class FormViewModel(
                     Log.d("SENSOR_DATA", "Mapping $key → $fieldUid")
                     Log.d("SENSOR_SAVE", "Saving $key=$value to field $fieldUid")
                     submitIntent(FormIntent.OnSave(fieldUid, value, ValueType.NUMBER))
-                    _sensorStatuses.update { it + (fieldUid to "Data received: $value") }
+                    _sensorStatuses.update { it + (fieldUid to SensorStatusText.dataReceived(value)) }
                     _isFieldScanning.update { it + (fieldUid to false) }
                 }
                 return@onEach
@@ -243,7 +245,7 @@ class FormViewModel(
                         Log.d("SENSOR_DATA", "Mapping $key → $fieldUid")
                         Log.d("SENSOR_SAVE", "Saving $key=$value to field $fieldUid")
                         submitIntent(FormIntent.OnSave(fieldUid, value, ValueType.NUMBER))
-                        _sensorStatuses.update { it + (fieldUid to "Data received: $value") }
+                        _sensorStatuses.update { it + (fieldUid to SensorStatusText.dataReceived(value)) }
                         _isFieldScanning.update { it + (fieldUid to false) }
                     } else {
                         Log.w("SENSOR_DATA", "No mapping found for key: $key")
@@ -260,7 +262,7 @@ class FormViewModel(
                     }
                     Log.d("SENSOR_SAVE", "Saving $key=$value to field $fieldUid")
                     submitIntent(FormIntent.OnSave(fieldUid, value, ValueType.NUMBER))
-                    _sensorStatuses.update { it + (fieldUid to "Data received: $value") }
+                    _sensorStatuses.update { it + (fieldUid to SensorStatusText.dataReceived(value)) }
                     _isFieldScanning.update { it + (fieldUid to false) }
                 }
             }
@@ -274,10 +276,16 @@ class FormViewModel(
              val fieldUid = activeSensorFieldUid
                  ?: repository.currentFocusedItem()?.uid
                  ?: return@onEach
+             val currentStatus = _sensorStatuses.value[fieldUid]
              val status = when(state) {
-                 org.dhis2.sensor.ble.BleManager.ConnectionState.CONNECTED -> "Blood pressure sensor connected. Waiting for readings..."
-                 org.dhis2.sensor.ble.BleManager.ConnectionState.CONNECTING -> "Connecting to sensor..."
-                 org.dhis2.sensor.ble.BleManager.ConnectionState.DISCONNECTED -> "Disconnected"
+                 org.dhis2.sensor.ble.BleManager.ConnectionState.CONNECTED -> SensorStatusText.CONNECTED
+                 org.dhis2.sensor.ble.BleManager.ConnectionState.CONNECTING -> SensorStatusText.DIRECT_CONNECTING
+                 org.dhis2.sensor.ble.BleManager.ConnectionState.DISCONNECTED ->
+                     if (SensorFieldResolver.hasCompletedReading(currentStatus)) {
+                         SensorStatusText.RETAKE_HINT
+                     } else {
+                         SensorStatusText.WAITING_FOR_DATA
+                     }
                  org.dhis2.sensor.ble.BleManager.ConnectionState.DISCONNECTING -> "Disconnecting..."
              }
              Log.d(TAG, "Connection state changed: $status")
@@ -1247,7 +1255,7 @@ class FormViewModel(
 
         activeSensorFieldUid = uid  // remember which field is waiting for the reading
         _isFieldScanning.update { it + (uid to true) }
-        _sensorStatuses.update { it + (uid to "Waiting for sensor...") }
+        _sensorStatuses.update { it + (uid to SensorStatusText.SCANNING) }
 
         // Continuous scan — no timeout. Scan runs until the sensor is detected or
         // the user dismisses the dialog (which calls bleManager.stopScan()).
@@ -1275,19 +1283,28 @@ class FormViewModel(
         Log.d(TAG, "startSensorScan called: primary=$primaryFieldUid, secondary=$secondaryFieldUid")
         activeSensorFieldUid = primaryFieldUid
         secondarySensorFieldUid = secondaryFieldUid
+        val sensorType = SensorFieldResolver.resolveSensorType(primaryFieldUid, sensorConfigRepository)
+        val preferredMacAddress =
+            SensorFieldResolver.resolvePreferredMacAddress(primaryFieldUid, sensorConfigRepository)
+        val initialStatus =
+            if (preferredMacAddress != null) {
+                SensorStatusText.DIRECT_CONNECTING
+            } else {
+                SensorStatusText.SCANNING
+            }
         _isFieldScanning.update { map ->
             var m = map + (primaryFieldUid to true)
             if (secondaryFieldUid != null) m = m + (secondaryFieldUid to true)
             m
         }
         _sensorStatuses.update { map ->
-            var m = map + (primaryFieldUid to "Scanning for sensor...")
-            if (secondaryFieldUid != null) m = m + (secondaryFieldUid to "Scanning for sensor...")
+            var m = map + (primaryFieldUid to initialStatus)
+            if (secondaryFieldUid != null) m = m + (secondaryFieldUid to initialStatus)
             m
         }
         Log.d(TAG, "Starting BLE scan via bleManager")
         try {
-            bleManager.startScan()
+            bleManager.startScan(preferredMacAddress, sensorType)
             Log.d(TAG, "BLE scan started successfully")
         } catch (e: Exception) {
             Log.e(TAG, "Error starting BLE scan", e)
@@ -1302,6 +1319,7 @@ class FormViewModel(
     /** Called when the sensor dialog is dismissed — stops scan and clears field tracking. */
     fun stopSensorScan() {
         bleManager.stopScan()
+        bleManager.disconnect()
         activeSensorFieldUid?.let { uid ->
             _isFieldScanning.update { it + (uid to false) }
         }
@@ -1310,6 +1328,17 @@ class FormViewModel(
         }
         activeSensorFieldUid = null
         secondarySensorFieldUid = null
+    }
+
+    fun retakeSensorMeasurement(
+        primaryFieldUid: String,
+        secondaryFieldUid: String? = null,
+    ) {
+        viewModelScope.launch {
+            bleManager.disconnect()
+            delay(300)
+            startSensorScan(primaryFieldUid, secondaryFieldUid)
+        }
     }
 
     private fun shouldRefreshVitalDashboard(fieldUid: String): Boolean =
