@@ -1,6 +1,7 @@
 package org.dhis2.sensors.device_manager
 
 import org.dhis2.sensor.config.SensorConfigRepository
+import org.dhis2.form.ui.sensor.SensorFieldResolver
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
@@ -15,6 +16,14 @@ class ReconnectManagerTest {
                 macAddress = "C0:26:DA:1B:06:A4",
                 deviceType = DeviceType.TEMPERATURE,
                 lastConnected = 1234L,
+                isPaired = true,
+            )
+        on { getPreferredDevice(DeviceType.BLOOD_PRESSURE) } doReturn
+            SensorDevice(
+                deviceName = "FORA BP Monitor",
+                macAddress = "C0:26:DA:19:D4:FE",
+                deviceType = DeviceType.BLOOD_PRESSURE,
+                lastConnected = 5678L,
                 isPaired = true,
             )
     }
@@ -60,5 +69,18 @@ class ReconnectManagerTest {
             )
 
         assertNull(macAddress)
+    }
+
+    @Test
+    fun `should match blood pressure fields to saved BP device`() {
+        val reconnectManager = ReconnectManager(pairedDeviceRepository)
+
+        val device =
+            reconnectManager.resolvePreferredDevice(
+                fieldUid = SensorFieldResolver.SYSTOLIC_UID,
+                sensorConfigRepository = sensorConfigRepository,
+            )
+
+        assertEquals("C0:26:DA:19:D4:FE", device?.macAddress)
     }
 }

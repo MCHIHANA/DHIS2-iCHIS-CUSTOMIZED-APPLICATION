@@ -3,30 +3,37 @@ package org.dhis2.sensors.device_manager
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
+import org.mockito.kotlin.any
 import org.mockito.kotlin.argumentCaptor
-import org.mockito.kotlin.doReturn
+import org.mockito.kotlin.doAnswer
 import org.mockito.kotlin.mock
 import org.mockito.kotlin.verify
 
 class PairedDeviceRepositoryTest {
+    private var storedDevices =
+        listOf(
+            SensorDevice(
+                deviceName = "Older Thermometer",
+                macAddress = "AA:BB:CC:00:00:01",
+                deviceType = DeviceType.TEMPERATURE,
+                lastConnected = 100L,
+                isPaired = true,
+            ),
+            SensorDevice(
+                deviceName = "Newer Thermometer",
+                macAddress = "AA:BB:CC:00:00:02",
+                deviceType = DeviceType.TEMPERATURE,
+                lastConnected = 200L,
+                isPaired = true,
+            ),
+        )
+
     private val storageManager: DeviceStorageManager = mock {
-        on { loadDevices() } doReturn
-            listOf(
-                SensorDevice(
-                    deviceName = "Older Thermometer",
-                    macAddress = "AA:BB:CC:00:00:01",
-                    deviceType = DeviceType.TEMPERATURE,
-                    lastConnected = 100L,
-                    isPaired = true,
-                ),
-                SensorDevice(
-                    deviceName = "Newer Thermometer",
-                    macAddress = "AA:BB:CC:00:00:02",
-                    deviceType = DeviceType.TEMPERATURE,
-                    lastConnected = 200L,
-                    isPaired = true,
-                ),
-            )
+        on { loadDevices() } doAnswer { storedDevices }
+        on { saveDevices(any()) } doAnswer {
+            storedDevices = it.getArgument(0)
+            Unit
+        }
     }
 
     @Test
@@ -63,5 +70,25 @@ class PairedDeviceRepositoryTest {
         repository.removeDevice("AA:BB:CC:00:00:02")
 
         assertNull(repository.findDevice("AA:BB:CC:00:00:02"))
+    }
+
+    @Test
+    fun `should replace duplicate address when pairing again`() {
+        val repository = PairedDeviceRepository(storageManager)
+
+        repository.pairDevice(
+            deviceName = "Updated Thermometer",
+            macAddress = "aa:bb:cc:00:00:02",
+            deviceType = DeviceType.TEMPERATURE,
+            lastConnected = 300L,
+        )
+
+        val matchingDevices =
+            repository.devices.value.filter {
+                it.macAddress.equals("AA:BB:CC:00:00:02", ignoreCase = true)
+            }
+        assertEquals(1, matchingDevices.size)
+        assertEquals("Updated Thermometer", matchingDevices.single().deviceName)
+        assertEquals(300L, matchingDevices.single().lastConnected)
     }
 }
