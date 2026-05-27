@@ -191,6 +191,7 @@ class FormViewModel(
 
     /** UID of the field currently waiting for a sensor reading. Set when scan starts. */
     private var activeSensorFieldUid: String? = null
+    private var sensorReconnectJob: kotlinx.coroutines.Job? = null
 
     /**
      * UID of the secondary field for multi-value sensors (e.g. pulse rate when
@@ -284,25 +285,39 @@ class FormViewModel(
              if (state == org.dhis2.sensor.ble.BleManager.ConnectionState.CONNECTED) {
                  rememberConnectedDevice(fieldUid)
              }
-             val currentStatus = _sensorStatuses.value[fieldUid]
-             val status = when(state) {
-                 org.dhis2.sensor.ble.BleManager.ConnectionState.CONNECTED -> SensorStatusText.CONNECTED
-                 org.dhis2.sensor.ble.BleManager.ConnectionState.CONNECTING -> SensorStatusText.DIRECT_CONNECTING
-                 org.dhis2.sensor.ble.BleManager.ConnectionState.DISCONNECTED ->
-                     if (SensorFieldResolver.hasCompletedReading(currentStatus)) {
-                         SensorStatusText.RETAKE_HINT
-                     } else {
-                         SensorStatusText.WAITING_FOR_DATA
-                     }
-                 org.dhis2.sensor.ble.BleManager.ConnectionState.DISCONNECTING -> "Disconnecting..."
-             }
+             val status = sensorStatusForConnectionState(fieldUid, state)
              Log.d(TAG, "Connection state changed: $status")
              _sensorStatuses.update { it + (fieldUid to status) }
              // Also update secondary field status for multi-value sensors
              secondarySensorFieldUid?.let { secUid ->
-                 _sensorStatuses.update { it + (secUid to status) }
+                 _sensorStatuses.update {
+                     it + (secUid to sensorStatusForConnectionState(secUid, state))
+                 }
              }
         }.launchIn(viewModelScope)
+    }
+
+    private fun sensorStatusForConnectionState(
+        fieldUid: String,
+        state: org.dhis2.sensor.ble.BleManager.ConnectionState,
+    ): String {
+        val currentStatus = _sensorStatuses.value[fieldUid]
+        return when (state) {
+            org.dhis2.sensor.ble.BleManager.ConnectionState.CONNECTED -> SensorStatusText.CONNECTED
+            org.dhis2.sensor.ble.BleManager.ConnectionState.CONNECTING ->
+                if (currentStatus == SensorStatusText.RETAKING_MEASUREMENT) {
+                    currentStatus
+                } else {
+                    SensorStatusText.DIRECT_CONNECTING
+                }
+            org.dhis2.sensor.ble.BleManager.ConnectionState.DISCONNECTED ->
+                when {
+                    SensorFieldResolver.hasCompletedReading(currentStatus) -> currentStatus.orEmpty()
+                    SensorStatusText.isActiveWorkflow(currentStatus) -> currentStatus.orEmpty()
+                    else -> SensorStatusText.WAITING_FOR_DATA
+                }
+            org.dhis2.sensor.ble.BleManager.ConnectionState.DISCONNECTING -> "Disconnecting..."
+        }
     }
 
     private fun rememberConnectedDevice(fieldUid: String) {
@@ -1347,6 +1362,8 @@ class FormViewModel(
 
     /** Called when the sensor dialog is dismissed — stops scan and clears field tracking. */
     fun stopSensorScan() {
+        sensorReconnectJob?.cancel()
+        sensorReconnectJob = null
         bleManager.stopScan()
         bleManager.disconnect()
         activeSensorFieldUid?.let { uid ->
@@ -1362,13 +1379,44 @@ class FormViewModel(
     fun retakeSensorMeasurement(
         primaryFieldUid: String,
         secondaryFieldUid: String? = null,
-    ) = reconnectSensorDevice(primaryFieldUid, secondaryFieldUid)
+    ) {
+        restartSensorWorkflow(
+            primaryFieldUid = primaryFieldUid,
+            secondaryFieldUid = secondaryFieldUid,
+            restartStatus = SensorStatusText.RETAKING_MEASUREMENT,
+        )
+    }
 
     fun reconnectSensorDevice(
         primaryFieldUid: String,
         secondaryFieldUid: String? = null,
     ) {
-        viewModelScope.launch {
+        restartSensorWorkflow(
+            primaryFieldUid = primaryFieldUid,
+            secondaryFieldUid = secondaryFieldUid,
+            restartStatus = SensorStatusText.RECONNECTING_DEVICE,
+        )
+    }
+
+    private fun restartSensorWorkflow(
+        primaryFieldUid: String,
+        secondaryFieldUid: String?,
+        restartStatus: String,
+    ) {
+        activeSensorFieldUid = primaryFieldUid
+        secondarySensorFieldUid = secondaryFieldUid
+        _isFieldScanning.update { map ->
+            var m = map + (primaryFieldUid to true)
+            if (secondaryFieldUid != null) m = m + (secondaryFieldUid to true)
+            m
+        }
+        _sensorStatuses.update { map ->
+            var m = map + (primaryFieldUid to restartStatus)
+            if (secondaryFieldUid != null) m = m + (secondaryFieldUid to restartStatus)
+            m
+        }
+        sensorReconnectJob?.cancel()
+        sensorReconnectJob = viewModelScope.launch {
             bleManager.disconnect()
             delay(300)
             startSensorScan(primaryFieldUid, secondaryFieldUid)

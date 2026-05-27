@@ -4,6 +4,8 @@ object SensorStatusText {
     const val SCANNING = "Searching for sensor..."
     const val DIRECT_CONNECTING = "Connecting to sensor..."
     const val SAVED_DEVICE_CONNECTING = "Reconnecting to saved device..."
+    const val RECONNECTING_DEVICE = "Reconnecting device..."
+    const val RETAKING_MEASUREMENT = "Retaking measurement..."
     const val CONNECTED = "Sensor connected. Receiving data..."
     const val WAITING_FOR_DATA = "Waiting for measurement data..."
     const val RETAKE_HINT = "Reconnect sensor to retake measurement."
@@ -17,6 +19,14 @@ object SensorStatusText {
 
     fun isConnected(status: String?): Boolean =
         status?.contains("connected", ignoreCase = true) == true
+
+    fun isActiveWorkflow(status: String?): Boolean =
+        status == SCANNING ||
+            status == DIRECT_CONNECTING ||
+            status == SAVED_DEVICE_CONNECTING ||
+            status == RECONNECTING_DEVICE ||
+            status == RETAKING_MEASUREMENT ||
+            status == WAITING_FOR_DATA
 
     fun isFailure(status: String?): Boolean =
         status == NO_SENSOR_FOUND ||
