@@ -3,9 +3,11 @@ package org.dhis2.usescases.vitaldashboard
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.setMain
+import org.dhis2.commons.vitals.VitalDashboardRefreshBus
 import org.dhis2.mobile.commons.coroutine.Dispatcher
 import org.dhis2.usescases.vitaldashboard.model.VitalSignType
 import org.dhis2.usescases.vitaldashboard.repository.VitalDashboardRepository
@@ -16,6 +18,8 @@ import org.junit.Before
 import org.junit.Test
 import org.mockito.kotlin.doReturn
 import org.mockito.kotlin.mock
+import org.mockito.kotlin.times
+import org.mockito.kotlin.verify
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class VitalDashboardViewModelTest {
@@ -93,6 +97,40 @@ class VitalDashboardViewModelTest {
         assertTrue(viewModel.uiState.value is VitalDashboardUiState.Success)
         val successState = viewModel.uiState.value as VitalDashboardUiState.Success
         assertEquals("Jane Doe", successState.data.patientSummaries.first().patientName)
+    }
+
+    @Test
+    fun `should refresh dashboard data when refresh bus emits`() {
+        val dashboardData =
+            VitalDashboardData(
+                patientSummaries = emptyList(),
+                recentMeasurements = emptyList(),
+                alerts = emptyList(),
+                statistics =
+                    VitalStatistics(
+                        totalPatients = 0,
+                        totalMeasurements = 0,
+                        activeAlerts = 0,
+                        measurementsToday = 0,
+                        averagesByType = emptyMap(),
+                    ),
+                trends = emptyMap(),
+            )
+
+        repository =
+            mock {
+                onBlocking { isUserAuthorized() } doReturn true
+                onBlocking { getDashboardData(VitalDashboardFilter()) } doReturn dashboardData
+            }
+
+        buildViewModel()
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        VitalDashboardRefreshBus.notifyRefresh()
+        testDispatcher.scheduler.advanceTimeBy(400)
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        verify(repository, times(2)).getDashboardData(VitalDashboardFilter())
     }
 
     private fun buildViewModel() =
