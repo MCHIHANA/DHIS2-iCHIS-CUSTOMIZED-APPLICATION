@@ -34,6 +34,7 @@ class DeviceConnectionService(
     val currentDeviceAddress = bleManager.currentDeviceAddress
     val currentDeviceName = bleManager.currentDeviceName
     val sensorData = bleManager.sensorData
+    val lastFailure = bleManager.lastFailure
 
     private var requestedDeviceType: DeviceType? = null
 

@@ -39,7 +39,11 @@ class BleManager(
         },
         onReadingsReceived = { readings ->
             SensorLogger.d(TAG, "Readings received from device: ${readings.size}")
+            _lastFailure.value = null
             _sensorData.value = readings
+        },
+        onConnectionFailed = { message ->
+            _lastFailure.value = message
         },
     )
 
@@ -60,6 +64,9 @@ class BleManager(
     private val _sensorData = MutableStateFlow<List<SensorReading>>(emptyList())
     val sensorData: StateFlow<List<SensorReading>> = _sensorData.asStateFlow()
 
+    private val _lastFailure = MutableStateFlow<String?>(null)
+    val lastFailure: StateFlow<String?> = _lastFailure.asStateFlow()
+
     private val _currentDeviceAddress = MutableStateFlow<String?>(null)
     val currentDeviceAddress: StateFlow<String?> = _currentDeviceAddress.asStateFlow()
 
@@ -72,6 +79,7 @@ class BleManager(
     ) {
         _devices.value = emptyList()
         _sensorData.value = emptyList()
+        _lastFailure.value = null
         isConnecting = false
         discoveryRetryJob?.cancel()
         currentSensorType = preferredSensorType
@@ -121,6 +129,7 @@ class BleManager(
             discoveryRetryJob?.cancel()
         }
         isConnecting = true
+        _lastFailure.value = null
         currentDevice = device
         _currentDeviceAddress.value = device.address.uppercase()
         _currentDeviceName.value = device.name
@@ -134,6 +143,7 @@ class BleManager(
         directReconnectJob?.cancel()
         discoveryRetryJob?.cancel()
         pendingDirectReconnect = null
+        _lastFailure.value = null
         bleConnector.disconnect()
     }
 
@@ -172,6 +182,7 @@ class BleManager(
         SensorLogger.w(TAG, "Falling back to BLE scan for ${reconnectRequest.address}: $reason")
         directReconnectJob?.cancel()
         pendingDirectReconnect = null
+        _lastFailure.value = null
         bleConnector.disconnect()
         startDiscoveryScan(
             preferredAddress = reconnectRequest.address,
@@ -221,7 +232,9 @@ class BleManager(
                             )
                         }
                 } else {
-                    SensorLogger.e(TAG, "BLE scan recovery exhausted after error $errorCode")
+                    val message = "BLE scan recovery exhausted after error $errorCode"
+                    SensorLogger.e(TAG, message)
+                    _lastFailure.value = message
                     _connectionState.value = ConnectionState.DISCONNECTED
                 }
             },

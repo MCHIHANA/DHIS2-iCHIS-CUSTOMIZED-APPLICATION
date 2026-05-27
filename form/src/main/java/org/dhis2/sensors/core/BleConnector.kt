@@ -20,6 +20,7 @@ import org.dhis2.sensors.utils.ValidationUtils
 class BleConnector(
     private val onConnectionStateChanged: (Boolean) -> Unit,
     private val onReadingsReceived: (List<SensorReading>) -> Unit,
+    private val onConnectionFailed: (String) -> Unit = {},
 ) {
     private var bluetoothGatt: BluetoothGatt? = null
     private var currentSensorType: SensorType = SensorType.UNKNOWN
@@ -61,7 +62,9 @@ class BleConnector(
             }
 
             if (status != BluetoothGatt.GATT_SUCCESS) {
-                SensorLogger.w(TAG_CONNECT, "Connection failed for ${gatt.device.address} (status=$status)")
+                val message = "Connection failed for ${gatt.device.address} (status=$status)"
+                SensorLogger.w(TAG_CONNECT, message)
+                onConnectionFailed(message)
                 currentSensorHandler?.onDisconnected()
                 closeCurrentGatt()
                 onConnectionStateChanged(false)
@@ -95,7 +98,9 @@ class BleConnector(
                 return
             }
             if (status != BluetoothGatt.GATT_SUCCESS) {
-                SensorLogger.w(TAG_SERVICE, "Service discovery failed for ${gatt.device.address} (status=$status)")
+                val message = "Service discovery failed for ${gatt.device.address} (status=$status)"
+                SensorLogger.w(TAG_SERVICE, message)
+                onConnectionFailed(message)
                 currentSensorHandler?.onDisconnected()
                 closeCurrentGatt()
                 onConnectionStateChanged(false)

@@ -28,6 +28,8 @@ class BleManager(
     private val _sensorData = MutableStateFlow<List<Pair<String, String>>>(emptyList())
     val sensorData: StateFlow<List<Pair<String, String>>> = _sensorData.asStateFlow()
 
+    val lastFailure: StateFlow<String?> = delegate.lastFailure
+
     val currentDeviceAddress: StateFlow<String?> = delegate.currentDeviceAddress
     val currentDeviceName: StateFlow<String?> = delegate.currentDeviceName
 

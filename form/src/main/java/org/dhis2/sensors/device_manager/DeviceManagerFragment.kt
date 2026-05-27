@@ -99,6 +99,7 @@ private fun DeviceManagerScreen(
     val connectionState by viewModel.connectionState.collectAsState()
     val currentDeviceAddress by viewModel.currentDeviceAddress.collectAsState()
     val isReceivingData by viewModel.isReceivingData.collectAsState()
+    val lastFailure by viewModel.lastFailure.collectAsState()
 
     var permissionDenied by remember { mutableStateOf(false) }
     var pendingAction by remember { mutableStateOf<(() -> Unit)?>(null) }
@@ -164,6 +165,14 @@ private fun DeviceManagerScreen(
                     )
                 }
             }
+            lastFailure?.let { message ->
+                item {
+                    StatusBanner(
+                        message = message,
+                        color = MaterialTheme.colorScheme.error,
+                    )
+                }
+            }
 
             items(
                 listOf(
@@ -182,6 +191,7 @@ private fun DeviceManagerScreen(
                     currentDeviceAddress = currentDeviceAddress,
                     connectionState = connectionState,
                     isReceivingData = isReceivingData,
+                    lastFailure = lastFailure,
                     onAddDevice = {
                         runWithBlePermissions { viewModel.startPairing(deviceType) }
                     },
@@ -260,6 +270,7 @@ private fun DeviceTypeSection(
     currentDeviceAddress: String?,
     connectionState: org.dhis2.sensor.ble.BleManager.ConnectionState,
     isReceivingData: Boolean,
+    lastFailure: String?,
     onAddDevice: () -> Unit,
     onCancelPairing: () -> Unit,
     onPairDevice: (BluetoothDevice) -> Unit,
@@ -298,6 +309,7 @@ private fun DeviceTypeSection(
                         isActive = currentDeviceAddress.equals(device.macAddress, ignoreCase = true),
                         connectionState = connectionState,
                         isReceivingData = isReceivingData,
+                        lastFailure = lastFailure,
                         onConnect = { onConnect(device) },
                         onDisconnect = onDisconnect,
                         onRemove = { onRemove(device.macAddress) },
@@ -328,6 +340,7 @@ private fun SavedDeviceCard(
     isActive: Boolean,
     connectionState: org.dhis2.sensor.ble.BleManager.ConnectionState,
     isReceivingData: Boolean,
+    lastFailure: String?,
     onConnect: () -> Unit,
     onDisconnect: () -> Unit,
     onRemove: () -> Unit,
@@ -353,7 +366,7 @@ private fun SavedDeviceCard(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             Text(
-                text = "Status: ${statusText(isActive, connectionState, isReceivingData)}",
+                text = "Status: ${statusText(isActive, connectionState, isReceivingData, lastFailure)}",
                 style = MaterialTheme.typography.bodyMedium,
             )
             Text(
@@ -502,9 +515,11 @@ private fun statusText(
     isActive: Boolean,
     connectionState: org.dhis2.sensor.ble.BleManager.ConnectionState,
     isReceivingData: Boolean,
+    lastFailure: String?,
 ): String =
     when {
         !isActive -> "Disconnected"
+        lastFailure != null -> "Failed"
         isReceivingData -> "Receiving Data"
         connectionState == org.dhis2.sensor.ble.BleManager.ConnectionState.CONNECTED -> "Connected"
         connectionState == org.dhis2.sensor.ble.BleManager.ConnectionState.CONNECTING -> "Connecting"

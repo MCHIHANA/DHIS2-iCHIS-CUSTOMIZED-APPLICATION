@@ -23,6 +23,7 @@ class DeviceManagerViewModel(
     val pairingDeviceType: StateFlow<DeviceType?> = deviceConnectionService.pairingDeviceType
     val connectionState = deviceConnectionService.connectionState
     val currentDeviceAddress = deviceConnectionService.currentDeviceAddress
+    val lastFailure = deviceConnectionService.lastFailure
 
     private val _isReceivingData = MutableStateFlow(false)
     val isReceivingData: StateFlow<Boolean> = _isReceivingData.asStateFlow()
