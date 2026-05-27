@@ -23,6 +23,9 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.update
+import org.dhis2.commons.vitals.RefreshSource
+import org.dhis2.commons.vitals.VitalDashboardRefreshBus
+import org.dhis2.commons.vitals.VitalDashboardRefreshEvent
 import org.dhis2.form.ui.sensor.SensorConnectionManager
 import org.dhis2.form.ui.SensorType
 import kotlinx.coroutines.flow.receiveAsFlow
@@ -412,6 +415,17 @@ class FormViewModel(
                 repository.fetchFormItems(openErrorLocation)
             } else {
                 repository.updateValueOnList(action.id, action.value, action.valueType)
+            }
+
+            if (saveResult?.valueStoreResult == ValueStoreResult.VALUE_CHANGED &&
+                shouldRefreshVitalDashboard(action.id)
+            ) {
+                VitalDashboardRefreshBus.notifyRefresh(
+                    VitalDashboardRefreshEvent(
+                        source = RefreshSource.DATA_VALUE_SAVED,
+                        fieldUid = action.id,
+                    ),
+                )
             }
         } else {
             repository.updateErrorList(
@@ -1105,6 +1119,9 @@ class FormViewModel(
                 async(dispatcher.io()) {
                     repository.completeEvent()
                 }.await()
+                VitalDashboardRefreshBus.notifyRefresh(
+                    VitalDashboardRefreshEvent(source = RefreshSource.EVENT_COMPLETED),
+                )
             } catch (e: Exception) {
                 Timber.e(e)
             }
@@ -1114,6 +1131,9 @@ class FormViewModel(
     fun activateEvent() {
         viewModelScope.launch(dispatcher.io()) {
             repository.activateEvent()
+            VitalDashboardRefreshBus.notifyRefresh(
+                VitalDashboardRefreshEvent(source = RefreshSource.EVENT_ACTIVATED),
+            )
         }
     }
 
@@ -1292,7 +1312,22 @@ class FormViewModel(
         secondarySensorFieldUid = null
     }
 
+    private fun shouldRefreshVitalDashboard(fieldUid: String): Boolean =
+        fieldUid == EVENT_REPORT_DATE_UID ||
+            sensorConfigRepository.getConfigByDataElement(fieldUid) != null ||
+            fieldUid in vitalDashboardFieldUids
+
     companion object {
         const val TAG = "FormViewModel"
+
+        private val vitalDashboardFieldUids =
+            setOf(
+                "KXNH45ts16S",
+                "VqwQWWDmYLn",
+                "tZbUrUbhUNy",
+                "S7OjKl85YSh",
+                "HkfzcXMdLLF",
+                "BaGxiB8AsNI",
+            )
     }
 }
