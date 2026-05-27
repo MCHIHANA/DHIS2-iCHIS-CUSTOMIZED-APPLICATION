@@ -83,6 +83,8 @@ import org.hisp.dhis.mobile.ui.designsystem.component.model.RegExValidations
 import androidx.compose.ui.platform.LocalContext
 import org.dhis2.form.ui.FormViewModel
 import androidx.compose.runtime.collectAsState
+import org.dhis2.form.ui.sensor.SensorFieldResolver
+import org.dhis2.form.ui.sensor.SensorStatusText
 
 @Composable
 fun FieldProvider(
@@ -219,14 +221,7 @@ fun SensorButtonWrapper(
 
     // Known sensor field UIDs — hardcoded as a guaranteed fallback when DataStore
     // hasn't loaded yet or viewModel is null (e.g. search screen).
-    val knownSensorUids = setOf(
-        "KXNH45ts16S", // Temperature
-        "VqwQWWDmYLn", // SpO2
-        "tZbUrUbhUNy", // Pulse Rate
-        "S7OjKl85YSh", // Heart Rate
-        "HkfzcXMdLLF", // Systolic BP
-        "BaGxiB8AsNI", // Diastolic BP (updated to match your DHIS2)
-    )
+    val knownSensorUids = SensorFieldResolver.knownSensorFieldUids
 
     val isSensorField = when {
         sensorConfig != null -> true                          // DataStore match
@@ -251,6 +246,9 @@ fun SensorButtonWrapper(
     }
 
     if (bleAvailable && isSensorField && fieldUiModel.editable) {
+        val hasCompletedReading = SensorFieldResolver.hasCompletedReading(sensorStatus)
+        val actionLabel = if (hasCompletedReading) "Retake Measurement" else "Connect Sensor"
+
         Column(modifier = Modifier.fillMaxWidth()) {
             // Row layout: [Field Content] [Spacer] [Connect Sensor Button]
             Row(
@@ -276,8 +274,8 @@ fun SensorButtonWrapper(
                 // Spacer between field and button
                 Spacer(modifier = Modifier.width(4.dp))
 
-                // Inline "Connect Sensor" text button
                 org.dhis2.form.ui.sensor.SensorConnectButton(
+                    text = actionLabel,
                     onClick = { onConnectToSensor(fieldUiModel.uid) }
                 )
             }
@@ -285,10 +283,10 @@ fun SensorButtonWrapper(
             // Status text below the field row
             if (isScanning || !sensorStatus.isNullOrEmpty()) {
                 Text(
-                    text = sensorStatus ?: "Searching...",
+                    text = sensorStatus ?: SensorStatusText.WAITING_FOR_DATA,
                     style = MaterialTheme.typography.bodySmall,
                     color = when {
-                        sensorStatus?.startsWith("Data received", ignoreCase = true) == true -> Color(0xFF4CAF50)
+                        hasCompletedReading -> Color(0xFF4CAF50)
                         sensorStatus?.contains("connected", ignoreCase = true) == true -> Color(0xFF4CAF50)
                         sensorStatus?.contains("No connections", ignoreCase = true) == true -> Color(0xFFF44336)
                         sensorStatus?.contains("denied", ignoreCase = true) == true -> Color(0xFFF44336)
