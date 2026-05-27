@@ -21,9 +21,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import org.dhis2.usescases.vitaldashboard.RecentVitalReading
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
 
 @Composable
 fun RecentMeasurementsTabContent(
@@ -31,6 +28,8 @@ fun RecentMeasurementsTabContent(
     onPatientClick: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val now = rememberDashboardClock()
+
     if (measurements.isEmpty()) {
         Box(
             modifier = modifier.fillMaxSize(),
@@ -51,6 +50,7 @@ fun RecentMeasurementsTabContent(
             items(measurements) { reading ->
                 RecentReadingCard(
                     reading = reading,
+                    now = now,
                     onClick = { onPatientClick(reading.patientUid) },
                 )
             }
@@ -61,6 +61,7 @@ fun RecentMeasurementsTabContent(
 @Composable
 fun RecentReadingCard(
     reading: RecentVitalReading,
+    now: Long,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -101,7 +102,17 @@ fun RecentReadingCard(
                     )
                 }
                 Text(
-                    text = formatMeasurementTime(reading.timestamp),
+                    text = "Taken: ${formatDashboardTimestamp(reading.timestamp)}",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Text(
+                    text = "Updated: ${formatDashboardTimestamp(reading.lastUpdatedTimestamp)}",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Text(
+                    text = "Freshness: ${formatReadingFreshness(reading.timestamp, now)}",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -122,39 +133,4 @@ fun RecentReadingCard(
             }
         }
     }
-}
-
-private fun formatMeasurementTime(timestamp: Long): String {
-    val date = Date(timestamp)
-    val diff = System.currentTimeMillis() - timestamp
-
-    return when {
-        diff < 3_600_000 -> {
-            val mins = diff / 60_000
-            if (mins < 1) "Just now" else "$mins min ago  (${SimpleDateFormat("HH:mm", Locale.getDefault()).format(date)})"
-        }
-        isSameDay(timestamp) ->
-            "Today  ${SimpleDateFormat("HH:mm", Locale.getDefault()).format(date)}"
-        isYesterday(timestamp) ->
-            "Yesterday  ${SimpleDateFormat("HH:mm", Locale.getDefault()).format(date)}"
-        else ->
-            SimpleDateFormat("dd MMM yyyy  HH:mm", Locale.getDefault()).format(date)
-    }
-}
-
-private fun isSameDay(timestamp: Long): Boolean {
-    val cal1 = java.util.Calendar.getInstance().apply { timeInMillis = System.currentTimeMillis() }
-    val cal2 = java.util.Calendar.getInstance().apply { timeInMillis = timestamp }
-    return cal1.get(java.util.Calendar.YEAR) == cal2.get(java.util.Calendar.YEAR) &&
-        cal1.get(java.util.Calendar.DAY_OF_YEAR) == cal2.get(java.util.Calendar.DAY_OF_YEAR)
-}
-
-private fun isYesterday(timestamp: Long): Boolean {
-    val cal1 = java.util.Calendar.getInstance().apply {
-        timeInMillis = System.currentTimeMillis()
-        add(java.util.Calendar.DAY_OF_YEAR, -1)
-    }
-    val cal2 = java.util.Calendar.getInstance().apply { timeInMillis = timestamp }
-    return cal1.get(java.util.Calendar.YEAR) == cal2.get(java.util.Calendar.YEAR) &&
-        cal1.get(java.util.Calendar.DAY_OF_YEAR) == cal2.get(java.util.Calendar.DAY_OF_YEAR)
 }
