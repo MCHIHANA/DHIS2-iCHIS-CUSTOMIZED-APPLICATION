@@ -65,15 +65,38 @@ object SensorFieldResolver {
         uid: String,
         sensorConfig: SensorConfig?,
     ): SensorType {
-        val normalizedName = sensorConfig?.name.orEmpty().lowercase()
-        if ("blood pressure" in normalizedName) {
+        val sensorHints =
+            buildList {
+                add(sensorConfig?.name.orEmpty())
+                add(sensorConfig?.type.orEmpty())
+                add(sensorConfig?.unit.orEmpty())
+                sensorConfig?.measurements?.keys?.let(::addAll)
+                sensorConfig?.dataElements?.let {
+                    add("systolic")
+                    add("diastolic")
+                }
+            }.joinToString(separator = " ").lowercase()
+
+        if (
+            "blood pressure" in sensorHints ||
+            "systolic" in sensorHints ||
+            "diastolic" in sensorHints ||
+            "bp" in sensorHints
+        ) {
             return SensorType.BLOOD_PRESSURE
         }
-        if ("temperature" in normalizedName || "thermometer" in normalizedName) {
+        if (
+            "temperature" in sensorHints ||
+            "thermometer" in sensorHints ||
+            "temp" in sensorHints
+        ) {
             return SensorType.TEMPERATURE
         }
-        if ("spo2" in normalizedName || "oxygen" in normalizedName || "oximeter" in normalizedName) {
+        if ("spo2" in sensorHints || "oxygen" in sensorHints || "oximeter" in sensorHints) {
             return SensorType.SPO2
+        }
+        if ("glucose" in sensorHints || "glucometer" in sensorHints) {
+            return SensorType.GLUCOSE
         }
 
         return when (uid) {

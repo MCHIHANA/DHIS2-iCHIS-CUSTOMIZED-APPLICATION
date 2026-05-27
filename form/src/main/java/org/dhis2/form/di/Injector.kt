@@ -62,20 +62,22 @@ object Injector {
         openErrorLocation: Boolean,
         useCompose: Boolean,
     ): FormViewModelFactory =
-        FormViewModelFactory(
-            provideFormRepository(
-                context,
-                repositoryRecords,
-                useCompose,
-            ),
-            provideDispatchers(),
-            provideBleManager(context),
-            provideSensorConfigRepository(context),
-            providePairedDeviceRepository(context),
-            provideReconnectManager(context),
-            openErrorLocation,
-            provideFormResultDialogProvider(context),
-        )
+        providePairedDeviceRepository(context).let { pairedDeviceRepository ->
+            FormViewModelFactory(
+                provideFormRepository(
+                    context,
+                    repositoryRecords,
+                    useCompose,
+                ),
+                provideDispatchers(),
+                provideBleManager(context),
+                provideSensorConfigRepository(context),
+                pairedDeviceRepository,
+                ReconnectManager(pairedDeviceRepository),
+                openErrorLocation,
+                provideFormResultDialogProvider(context),
+            )
+        }
 
     private fun provideSensorConfigRepository(context: Context) = 
         org.dhis2.sensor.config.SensorConfigRepository(context, org.dhis2.sensor.config.SensorConfigApi(provideD2()))
@@ -315,6 +317,7 @@ object Injector {
     private fun providePairedDeviceRepository(context: Context): PairedDeviceRepository =
         PairedDeviceRepository(DeviceStorageManager(context.applicationContext))
 
+    @Suppress("unused")
     private fun provideReconnectManager(context: Context): ReconnectManager =
         ReconnectManager(providePairedDeviceRepository(context))
 }
