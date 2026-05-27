@@ -49,6 +49,7 @@ class BleManager(
     private var currentDevice: BluetoothDevice? = null
     private var pendingDirectReconnect: DirectReconnectRequest? = null
     private var directReconnectJob: Job? = null
+    private var discoveryRetryJob: Job? = null
 
     private val _devices = MutableStateFlow<List<BluetoothDevice>>(emptyList())
     val devices: StateFlow<List<BluetoothDevice>> = _devices.asStateFlow()
@@ -72,6 +73,7 @@ class BleManager(
         _devices.value = emptyList()
         _sensorData.value = emptyList()
         isConnecting = false
+        discoveryRetryJob?.cancel()
         currentSensorType = preferredSensorType
         SensorLogger.d(TAG, "Starting BLE workflow (preferredMac=$preferredDeviceAddress, sensorType=$preferredSensorType)")
 
@@ -92,6 +94,7 @@ class BleManager(
     fun stopScan() {
         bleScanner.stopScan()
         directReconnectJob?.cancel()
+        discoveryRetryJob?.cancel()
         pendingDirectReconnect = null
     }
 
@@ -115,6 +118,7 @@ class BleManager(
             stopScan()
         } else {
             bleScanner.stopScan()
+            discoveryRetryJob?.cancel()
         }
         isConnecting = true
         currentDevice = device
@@ -128,6 +132,7 @@ class BleManager(
     fun disconnect() {
         isConnecting = false
         directReconnectJob?.cancel()
+        discoveryRetryJob?.cancel()
         pendingDirectReconnect = null
         bleConnector.disconnect()
     }
@@ -177,10 +182,11 @@ class BleManager(
     private fun startDiscoveryScan(
         preferredAddress: String?,
         preferredSensorType: SensorType,
+        retryCount: Int = 0,
     ) {
         isConnecting = false
         _connectionState.value = ConnectionState.DISCONNECTED
-        SensorLogger.d(TAG, "Starting BLE discovery scan")
+        SensorLogger.d(TAG, "Starting BLE discovery scan (retry=$retryCount)")
         bleScanner.startScan(
             preferredTargetAddress = preferredAddress,
             onDeviceFound = { device ->
@@ -200,6 +206,24 @@ class BleManager(
                 val sensorType = resolveSensorType(device, preferredSensorType)
                 SensorLogger.d(TAG, "Target sensor found: $sensorType (${device.address})")
                 connectDevice(device, sensorType)
+            },
+            onScanFailed = { errorCode ->
+                if (retryCount < MAX_SCAN_RECOVERY_RETRIES) {
+                    SensorLogger.w(TAG, "Recovering BLE scan after error $errorCode")
+                    discoveryRetryJob?.cancel()
+                    discoveryRetryJob =
+                        scope.launch {
+                            delay(SCAN_RECOVERY_DELAY_MS)
+                            startDiscoveryScan(
+                                preferredAddress = preferredAddress,
+                                preferredSensorType = preferredSensorType,
+                                retryCount = retryCount + 1,
+                            )
+                        }
+                } else {
+                    SensorLogger.e(TAG, "BLE scan recovery exhausted after error $errorCode")
+                    _connectionState.value = ConnectionState.DISCONNECTED
+                }
             },
         )
     }
@@ -225,5 +249,7 @@ class BleManager(
     private companion object {
         const val TAG = "BleManager"
         const val DIRECT_RECONNECT_TIMEOUT_MS = 8_000L
+        const val SCAN_RECOVERY_DELAY_MS = 700L
+        const val MAX_SCAN_RECOVERY_RETRIES = 2
     }
 }

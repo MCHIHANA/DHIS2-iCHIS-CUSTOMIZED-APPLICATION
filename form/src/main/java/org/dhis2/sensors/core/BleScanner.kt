@@ -31,6 +31,7 @@ class BleScanner(
         onDeviceFound: (BluetoothDevice) -> Unit,
         onTargetFound: ((BluetoothDevice) -> Unit)? = null,
         onAdvertisementTemperature: ((Double) -> Unit)? = null,
+        onScanFailed: ((Int) -> Unit)? = null,
     ) {
         if (scanCallback != null) {
             SensorLogger.w(TAG, "Scan already in progress, restarting")
@@ -119,6 +120,9 @@ class BleScanner(
 
             override fun onScanFailed(errorCode: Int) {
                 SensorLogger.e(TAG, "Scan failed with error code: $errorCode")
+                scanCallback = null
+                seenDevices.clear()
+                onScanFailed?.invoke(errorCode)
             }
         }
 
