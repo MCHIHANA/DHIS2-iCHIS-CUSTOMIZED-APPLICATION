@@ -56,6 +56,7 @@ class DeviceConnectionService(
     }
 
     fun startPairingScan(deviceType: DeviceType) {
+        bleManager.disconnect()
         stopPairingScan()
         requestedDeviceType = null
         _pairingDeviceType.value = deviceType

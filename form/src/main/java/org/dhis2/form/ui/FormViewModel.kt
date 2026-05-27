@@ -1303,6 +1303,8 @@ class FormViewModel(
         activeSensorFieldUid = primaryFieldUid
         secondarySensorFieldUid = secondaryFieldUid
         val sensorType = SensorFieldResolver.resolveSensorType(primaryFieldUid, sensorConfigRepository)
+        val savedDevice =
+            reconnectManager.resolvePreferredDevice(primaryFieldUid, sensorConfigRepository)
         val fallbackMacAddress =
             SensorFieldResolver.resolvePreferredMacAddress(primaryFieldUid, sensorConfigRepository)
         val preferredMacAddress =
@@ -1312,7 +1314,9 @@ class FormViewModel(
                 fallbackMacAddress = fallbackMacAddress,
             )
         val initialStatus =
-            if (preferredMacAddress != null) {
+            if (savedDevice != null) {
+                SensorStatusText.SAVED_DEVICE_CONNECTING
+            } else if (preferredMacAddress != null) {
                 SensorStatusText.DIRECT_CONNECTING
             } else {
                 SensorStatusText.SCANNING

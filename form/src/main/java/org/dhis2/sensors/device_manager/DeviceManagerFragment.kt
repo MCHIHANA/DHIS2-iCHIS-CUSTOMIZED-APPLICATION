@@ -267,6 +267,13 @@ private fun DeviceTypeSection(
     onDisconnect: () -> Unit,
     onRemove: (String) -> Unit,
 ) {
+    val newDevices =
+        availableDevices.filterNot { discoveredDevice ->
+            pairedDevices.any { pairedDevice ->
+                pairedDevice.macAddress.equals(discoveredDevice.address, ignoreCase = true)
+            }
+        }
+
     Card {
         Column(
             modifier = Modifier.padding(16.dp),
@@ -306,7 +313,7 @@ private fun DeviceTypeSection(
 
             if (isPairing) {
                 PairingPanel(
-                    devices = availableDevices,
+                    devices = newDevices,
                     onPairDevice = onPairDevice,
                     onCancel = onCancelPairing,
                 )
@@ -407,7 +414,7 @@ private fun PairingPanel(
             )
             Text(
                 text = if (devices.isEmpty()) {
-                    "Keep the sensor powered on. Devices will appear here as soon as they are discovered."
+                    "Keep the sensor powered on. New devices will appear here as soon as they are discovered."
                 } else {
                     "Tap a discovered device to save it for fast reconnect."
                 },

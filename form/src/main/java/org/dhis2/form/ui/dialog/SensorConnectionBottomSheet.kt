@@ -217,7 +217,7 @@ fun SensorConnectionScreen(
 
                     displayStatus.contains("connecting", ignoreCase = true) ->
                         BluetoothSensorConnecting(
-                            statusMessage = SensorStatusText.DIRECT_CONNECTING,
+                            statusMessage = displayStatus,
                             helperText = SensorStatusText.WAITING_FOR_DATA,
                         )
 
