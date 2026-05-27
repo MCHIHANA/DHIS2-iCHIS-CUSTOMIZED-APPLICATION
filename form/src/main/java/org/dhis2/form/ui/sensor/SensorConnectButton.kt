@@ -15,6 +15,7 @@ import androidx.compose.ui.unit.dp
  */
 @Composable
 fun SensorConnectButton(
+    text: String = "Connect Sensor",
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -24,7 +25,7 @@ fun SensorConnectButton(
         modifier = modifier
     ) {
         Text(
-            text = "Connect Sensor",
+            text = text,
             style = MaterialTheme.typography.bodySmall
         )
     }
@@ -36,10 +37,12 @@ fun SensorConnectButton(
  */
 @Composable
 fun InlineSensorConnectButton(
+    text: String = "Connect Sensor",
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     SensorConnectButton(
+        text = text,
         onClick = onClick,
         modifier = modifier.width(100.dp)
     )

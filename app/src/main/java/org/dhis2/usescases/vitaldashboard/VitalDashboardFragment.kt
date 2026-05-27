@@ -67,6 +67,11 @@ class VitalDashboardFragment : FragmentGlobalAbstract() {
         }
     }
 
+    override fun onResume() {
+        super.onResume()
+        viewModel.refreshData()
+    }
+
     companion object {
         fun newInstance() = VitalDashboardFragment()
     }

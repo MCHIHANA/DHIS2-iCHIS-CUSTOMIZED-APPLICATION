@@ -28,6 +28,9 @@ class BleManager(
     private val _sensorData = MutableStateFlow<List<Pair<String, String>>>(emptyList())
     val sensorData: StateFlow<List<Pair<String, String>>> = _sensorData.asStateFlow()
 
+    val currentDeviceAddress: StateFlow<String?> = delegate.currentDeviceAddress
+    val currentDeviceName: StateFlow<String?> = delegate.currentDeviceName
+
     init {
         delegate.connectionState
             .onEach { _connectionState.value = it.toLegacy() }
@@ -40,8 +43,11 @@ class BleManager(
             .launchIn(scope)
     }
 
-    fun startScan() {
-        delegate.startScan()
+    fun startScan(
+        preferredDeviceAddress: String? = null,
+        sensorType: SensorType = SensorType.UNKNOWN,
+    ) {
+        delegate.startScan(preferredDeviceAddress, sensorType)
     }
 
     fun stopScan() {

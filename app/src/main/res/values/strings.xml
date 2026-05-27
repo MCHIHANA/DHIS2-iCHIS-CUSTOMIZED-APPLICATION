@@ -403,6 +403,7 @@
 
     <string name="menu_home">Home</string>
     <string name="vital_signs_dashboard">Vital Signs Dashboard</string>
+    <string name="device_manager">Device Manager</string>
     <string name="appwidget_text">EXAMPLE</string>
     <string name="add_widget">Add widget</string>
     <string name="showHelp">Show help</string>

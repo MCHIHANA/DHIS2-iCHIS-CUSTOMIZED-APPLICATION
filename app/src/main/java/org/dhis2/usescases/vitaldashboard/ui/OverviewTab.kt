@@ -26,9 +26,6 @@ import org.dhis2.usescases.vitaldashboard.PatientVitalSummary
 import org.dhis2.usescases.vitaldashboard.VitalDashboardData
 import org.dhis2.usescases.vitaldashboard.VitalStatistics
 import org.dhis2.usescases.vitaldashboard.model.VitalSignType
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
 
 @Composable
 fun OverviewTabContent(
@@ -36,6 +33,8 @@ fun OverviewTabContent(
     onPatientClick: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val now = rememberDashboardClock()
+
     LazyColumn(
         modifier = modifier,
         contentPadding = PaddingValues(16.dp),
@@ -48,6 +47,7 @@ fun OverviewTabContent(
         items(data.patientSummaries) { patient ->
             PatientVitalCard(
                 patient = patient,
+                now = now,
                 onClick = { onPatientClick(patient.patientUid) },
             )
         }
@@ -131,6 +131,7 @@ fun StatisticItem(
 @Composable
 fun PatientVitalCard(
     patient: PatientVitalSummary,
+    now: Long,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -211,11 +212,23 @@ fun PatientVitalCard(
                 }
             }
 
-            Text(
-                text = "Last updated: ${formatTimestamp(patient.lastMeasurementTime)}",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
+            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Text(
+                    text = "Taken: ${formatDashboardTimestamp(patient.lastMeasurementTime)}",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Text(
+                    text = "Updated: ${formatDashboardTimestamp(patient.lastUpdatedTime)}",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Text(
+                    text = "Freshness: ${formatReadingFreshness(patient.lastMeasurementTime, now)}",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
         }
     }
 }
@@ -244,43 +257,4 @@ fun VitalSignItem(
             )
         }
     }
-}
-
-private fun formatTimestamp(timestamp: Long): String {
-    val diff = System.currentTimeMillis() - timestamp
-    val date = Date(timestamp)
-
-    return when {
-        // Under 1 hour → show relative (useful for live clinical monitoring)
-        diff < 3_600_000 -> {
-            val mins = diff / 60_000
-            if (mins < 1) "Just now" else "$mins min ago  (${SimpleDateFormat("HH:mm", Locale.getDefault()).format(date)})"
-        }
-        // Same calendar day → show time only
-        isSameDay(timestamp) ->
-            "Today  ${SimpleDateFormat("HH:mm", Locale.getDefault()).format(date)}"
-        // Yesterday
-        isYesterday(timestamp) ->
-            "Yesterday  ${SimpleDateFormat("HH:mm", Locale.getDefault()).format(date)}"
-        // Older → full date + time
-        else ->
-            SimpleDateFormat("dd MMM yyyy  HH:mm", Locale.getDefault()).format(date)
-    }
-}
-
-private fun isSameDay(timestamp: Long): Boolean {
-    val cal1 = java.util.Calendar.getInstance().apply { timeInMillis = System.currentTimeMillis() }
-    val cal2 = java.util.Calendar.getInstance().apply { timeInMillis = timestamp }
-    return cal1.get(java.util.Calendar.YEAR) == cal2.get(java.util.Calendar.YEAR) &&
-        cal1.get(java.util.Calendar.DAY_OF_YEAR) == cal2.get(java.util.Calendar.DAY_OF_YEAR)
-}
-
-private fun isYesterday(timestamp: Long): Boolean {
-    val cal1 = java.util.Calendar.getInstance().apply {
-        timeInMillis = System.currentTimeMillis()
-        add(java.util.Calendar.DAY_OF_YEAR, -1)
-    }
-    val cal2 = java.util.Calendar.getInstance().apply { timeInMillis = timestamp }
-    return cal1.get(java.util.Calendar.YEAR) == cal2.get(java.util.Calendar.YEAR) &&
-        cal1.get(java.util.Calendar.DAY_OF_YEAR) == cal2.get(java.util.Calendar.DAY_OF_YEAR)
 }

@@ -32,9 +32,6 @@ import androidx.compose.ui.unit.dp
 import org.dhis2.usescases.vitaldashboard.TrendSeries
 import org.dhis2.usescases.vitaldashboard.VitalDashboardData
 import org.dhis2.usescases.vitaldashboard.model.VitalSignType
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
 
 /**
  * Trends Tab — lightweight, no external chart library.
@@ -50,6 +47,8 @@ fun TrendsTabContent(
     onVitalSignClick: (VitalSignType) -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val now = rememberDashboardClock()
+
     if (data.trends.isEmpty()) {
         Box(
             modifier = modifier.fillMaxSize(),
@@ -73,6 +72,7 @@ fun TrendsTabContent(
             VitalTrendSummaryCard(
                 vitalType = vitalType,
                 trendSeries = trendSeries,
+                now = now,
             )
         }
     }
@@ -82,6 +82,7 @@ fun TrendsTabContent(
 fun VitalTrendSummaryCard(
     vitalType: VitalSignType,
     trendSeries: List<TrendSeries>,
+    now: Long,
     modifier: Modifier = Modifier,
 ) {
     val allPoints = trendSeries.flatMap { it.points }
@@ -188,11 +189,18 @@ fun VitalTrendSummaryCard(
 
             // Last reading timestamp
             latestTimestamp?.let { ts ->
-                Text(
-                    text = "Last reading: ${formatTrendTime(ts)}",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
+                Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                    Text(
+                        text = "Last reading: ${formatDashboardTimestamp(ts)}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Text(
+                        text = "Freshness: ${formatReadingFreshness(ts, now)}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
             }
 
             // Per-series breakdown (e.g. Systolic / Diastolic for BP)
@@ -337,15 +345,5 @@ private fun SimpleRangeBar(
                 color = markerColor,
             )
         }
-    }
-}
-
-private fun formatTrendTime(timestamp: Long): String {
-    val diff = System.currentTimeMillis() - timestamp
-    return when {
-        diff < 60_000 -> "Just now"
-        diff < 3_600_000 -> "${diff / 60_000} min ago"
-        diff < 86_400_000 -> "${diff / 3_600_000} hr ago"
-        else -> SimpleDateFormat("MMM dd, HH:mm", Locale.getDefault()).format(Date(timestamp))
     }
 }

@@ -2,10 +2,13 @@ package org.dhis2.usescases.vitaldashboard
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import org.dhis2.commons.vitals.VitalDashboardRefreshBus
 import org.dhis2.mobile.commons.coroutine.Dispatcher
 import org.dhis2.usescases.vitaldashboard.model.VitalSignType
 import org.dhis2.usescases.vitaldashboard.repository.VitalMeasurementKind
@@ -38,7 +41,31 @@ class VitalDashboardViewModel(
     val filterState: StateFlow<VitalDashboardFilter> = _filterState.asStateFlow()
 
     init {
-        loadDashboardData()
+        observeRefreshSignals()
+        loadInitialState()
+    }
+
+    private fun loadInitialState() {
+        viewModelScope.launch(dispatchers.io) {
+            if (!repository.isUserAuthorized()) {
+                _uiState.value = VitalDashboardUiState.Unauthorized
+                return@launch
+            }
+
+            loadDashboardData()
+        }
+    }
+
+    private fun observeRefreshSignals() {
+        viewModelScope.launch(dispatchers.io) {
+            VitalDashboardRefreshBus.refreshEvents
+                .debounce(350)
+                .collectLatest {
+                    if (_uiState.value !is VitalDashboardUiState.Unauthorized) {
+                        loadDashboardData()
+                    }
+                }
+        }
     }
 
     /**
@@ -190,7 +217,8 @@ data class PatientVitalSummary(
     val gender: String?,
     val latestVitals: Map<VitalSignType, VitalValue>,
     val hasAlerts: Boolean,
-    val lastMeasurementTime: Long
+    val lastMeasurementTime: Long,
+    val lastUpdatedTime: Long,
 )
 
 /**
@@ -205,6 +233,7 @@ data class VitalMeasurement(
     val measurementKind: VitalMeasurementKind,
     val value: VitalValue,
     val timestamp: Long,
+    val lastUpdatedTimestamp: Long,
     val isAbnormal: Boolean,
     val notes: String?
 )
@@ -214,6 +243,7 @@ data class RecentVitalReading(
     val patientUid: String,
     val patientName: String,
     val timestamp: Long,
+    val lastUpdatedTimestamp: Long,
     val values: Map<VitalSignType, VitalValue>,
     val hasAlerts: Boolean,
 )

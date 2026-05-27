@@ -19,5 +19,9 @@
             android:windowSoftInputMode="stateAlwaysHidden"
             android:exported="false"/>
 
+        <activity
+            android:name="org.dhis2.sensors.device_manager.DeviceManagerActivity"
+            android:exported="false" />
+
     </application>
 </manifest>
