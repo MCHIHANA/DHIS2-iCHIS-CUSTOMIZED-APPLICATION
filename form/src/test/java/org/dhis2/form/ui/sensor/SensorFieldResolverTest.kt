@@ -61,4 +61,19 @@ class SensorFieldResolverTest {
         assertTrue(SensorStatusText.isActiveWorkflow(SensorStatusText.RETAKING_MEASUREMENT))
         assertFalse(SensorStatusText.isActiveWorkflow(SensorStatusText.dataReceived("120")))
     }
+
+    @Test
+    fun `should not resolve bpm unit as blood pressure abbreviation`() {
+        val config =
+            SensorConfig(
+                name = "Heart Rate",
+                type = "single",
+                unit = "bpm",
+            )
+
+        assertEquals(
+            SensorType.UNKNOWN,
+            SensorFieldResolver.resolveSensorType(uid = "custom-field", sensorConfig = config),
+        )
+    }
 }

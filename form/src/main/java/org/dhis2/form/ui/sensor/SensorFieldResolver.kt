@@ -76,12 +76,13 @@ object SensorFieldResolver {
                     add("diastolic")
                 }
             }.joinToString(separator = " ").lowercase()
+        val sensorTokens = sensorHints.split(Regex("[^a-z0-9]+")).filter { it.isNotBlank() }
 
         if (
             "blood pressure" in sensorHints ||
             "systolic" in sensorHints ||
             "diastolic" in sensorHints ||
-            "bp" in sensorHints
+            "bp" in sensorTokens
         ) {
             return SensorType.BLOOD_PRESSURE
         }
