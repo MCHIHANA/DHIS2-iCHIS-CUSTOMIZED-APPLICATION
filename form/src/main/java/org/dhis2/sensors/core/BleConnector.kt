@@ -8,6 +8,7 @@ import android.bluetooth.BluetoothGattCharacteristic
 import android.bluetooth.BluetoothGattDescriptor
 import android.bluetooth.BluetoothProfile
 import android.content.Context
+import android.os.Build
 import org.dhis2.sensors.devices.bloodpressure.BloodPressureParser
 import org.dhis2.sensors.devices.temperature.TemperatureParser
 import org.dhis2.sensors.utils.BluetoothUtils
@@ -29,17 +30,21 @@ class BleConnector(
         device: BluetoothDevice,
         sensorType: SensorType,
     ) {
+        closeCurrentGatt()
         currentSensorType = sensorType
         currentSensorHandler = SensorRegistry.getHandler(sensorType)
         SensorLogger.d(TAG_CONNECT, "Connecting to ${device.address} (type=$sensorType)")
-        bluetoothGatt = device.connectGatt(context, true, gattCallback)
+        bluetoothGatt =
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                device.connectGatt(context, false, gattCallback, BluetoothDevice.TRANSPORT_LE)
+            } else {
+                device.connectGatt(context, false, gattCallback)
+            }
     }
 
     fun disconnect() {
         currentSensorHandler?.onDisconnected()
-        bluetoothGatt?.disconnect()
-        bluetoothGatt?.close()
-        bluetoothGatt = null
+        closeCurrentGatt()
         onConnectionStateChanged(false)
     }
 
@@ -49,6 +54,20 @@ class BleConnector(
             status: Int,
             newState: Int,
         ) {
+            if (!gatt.isCurrent()) {
+                SensorLogger.w(TAG_CONNECT, "Ignoring stale GATT callback from ${gatt.device.address}")
+                gatt.close()
+                return
+            }
+
+            if (status != BluetoothGatt.GATT_SUCCESS) {
+                SensorLogger.w(TAG_CONNECT, "Connection failed for ${gatt.device.address} (status=$status)")
+                currentSensorHandler?.onDisconnected()
+                closeCurrentGatt()
+                onConnectionStateChanged(false)
+                return
+            }
+
             when (newState) {
                 BluetoothProfile.STATE_CONNECTED -> {
                     SensorLogger.d(TAG_CONNECT, "Connected to ${gatt.device.address}")
@@ -59,8 +78,8 @@ class BleConnector(
                 BluetoothProfile.STATE_DISCONNECTED -> {
                     SensorLogger.d(TAG_CONNECT, "Disconnected from ${gatt.device.address} (status=$status)")
                     currentSensorHandler?.onDisconnected()
+                    closeCurrentGatt()
                     onConnectionStateChanged(false)
-                    gatt.close()
                 }
             }
         }
@@ -70,6 +89,18 @@ class BleConnector(
             status: Int,
         ) {
             SensorLogger.d(TAG_SERVICE, "Services discovered (status=$status) for $currentSensorType")
+            if (!gatt.isCurrent()) {
+                SensorLogger.w(TAG_SERVICE, "Ignoring services from stale GATT ${gatt.device.address}")
+                gatt.close()
+                return
+            }
+            if (status != BluetoothGatt.GATT_SUCCESS) {
+                SensorLogger.w(TAG_SERVICE, "Service discovery failed for ${gatt.device.address} (status=$status)")
+                currentSensorHandler?.onDisconnected()
+                closeCurrentGatt()
+                onConnectionStateChanged(false)
+                return
+            }
             gatt.services.forEach { service ->
                 SensorLogger.d(TAG_SERVICE, "Service: ${service.uuid}")
                 service.characteristics.forEach { characteristic ->
@@ -131,6 +162,15 @@ class BleConnector(
         ) {
             currentSensorHandler?.onCharacteristicWrite(gatt, characteristic, status)
         }
+    }
+
+    private fun BluetoothGatt.isCurrent(): Boolean = bluetoothGatt === this
+
+    private fun closeCurrentGatt() {
+        val gatt = bluetoothGatt ?: return
+        bluetoothGatt = null
+        runCatching { gatt.disconnect() }
+        runCatching { gatt.close() }
     }
 
     private fun dispatchReading(
