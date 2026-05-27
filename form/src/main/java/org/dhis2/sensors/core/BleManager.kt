@@ -59,6 +59,12 @@ class BleManager(
     private val _sensorData = MutableStateFlow<List<SensorReading>>(emptyList())
     val sensorData: StateFlow<List<SensorReading>> = _sensorData.asStateFlow()
 
+    private val _currentDeviceAddress = MutableStateFlow<String?>(null)
+    val currentDeviceAddress: StateFlow<String?> = _currentDeviceAddress.asStateFlow()
+
+    private val _currentDeviceName = MutableStateFlow<String?>(null)
+    val currentDeviceName: StateFlow<String?> = _currentDeviceName.asStateFlow()
+
     fun startScan(
         preferredDeviceAddress: String? = null,
         preferredSensorType: SensorType = SensorType.UNKNOWN,
@@ -96,6 +102,8 @@ class BleManager(
         stopScan()
         isConnecting = true
         currentDevice = device
+        _currentDeviceAddress.value = device.address.uppercase()
+        _currentDeviceName.value = device.name
         currentSensorType = resolveSensorType(device, sensorType)
         _connectionState.value = ConnectionState.CONNECTING
         bleConnector.connect(context, device, currentSensorType)

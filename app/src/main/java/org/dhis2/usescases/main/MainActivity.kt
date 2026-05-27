@@ -51,6 +51,7 @@ import org.dhis2.usescases.development.DevelopmentActivity
 import org.dhis2.usescases.general.ActivityGlobalAbstract
 import org.dhis2.usescases.login.LoginActivity
 import org.dhis2.usescases.main.ui.NewVersionDialog
+import org.dhis2.sensors.device_manager.DeviceManagerActivity
 import org.dhis2.utils.analytics.CLICK
 import org.dhis2.utils.analytics.CLOSE_SESSION
 import org.dhis2.utils.customviews.navigationbar.NavigationPage
@@ -583,6 +584,14 @@ class MainActivity :
 
             R.id.menu_vital_dashboard -> {
                 mainNavigator.openVitalDashboard()
+            }
+
+            R.id.menu_device_manager -> {
+                startActivity(Intent(this, DeviceManagerActivity::class.java))
+                binding.navView.setCheckedItem(
+                    mainNavigator.currentScreenName()?.let(mainNavigator::currentNavigationViewItemId)
+                        ?: R.id.menu_home,
+                )
             }
 
             R.id.menu_about -> {

@@ -246,6 +246,13 @@ fun SensorConnectionScreen(
                 if (hasReading) {
                     Button(
                         modifier = Modifier.fillMaxWidth(),
+                        text = "RECONNECT DEVICE",
+                        onClick = {
+                            viewModel.reconnectSensorDevice(fieldUid, secondaryFieldUid)
+                        },
+                    )
+                    Button(
+                        modifier = Modifier.fillMaxWidth(),
                         text = "RETAKE MEASUREMENT",
                         onClick = {
                             viewModel.retakeSensorMeasurement(fieldUid, secondaryFieldUid)

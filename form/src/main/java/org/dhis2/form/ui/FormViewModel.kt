@@ -66,6 +66,8 @@ import org.dhis2.form.ui.intent.FormIntent
 import org.dhis2.form.ui.provider.FormResultDialogProvider
 import org.dhis2.sensor.ble.BleManager
 import org.dhis2.sensor.config.SensorConfigRepository
+import org.dhis2.sensors.device_manager.PairedDeviceRepository
+import org.dhis2.sensors.device_manager.ReconnectManager
 import org.dhis2.mobile.commons.model.CustomIntentRequestArgumentModel
 import org.dhis2.mobile.commons.providers.CustomIntentFailure
 import org.dhis2.mobile.commons.validation.validators.FieldMaskValidator
@@ -89,6 +91,8 @@ class FormViewModel(
     private val dispatcher: DispatcherProvider,
     val bleManager: BleManager,
     val sensorConfigRepository: SensorConfigRepository,
+    private val pairedDeviceRepository: PairedDeviceRepository,
+    private val reconnectManager: ReconnectManager,
     private val geometryController: GeometryController = GeometryController(GeometryParserImpl()),
     private val openErrorLocation: Boolean = false,
     private val resultDialogUiProvider: FormResultDialogProvider,
@@ -277,6 +281,9 @@ class FormViewModel(
              val fieldUid = activeSensorFieldUid
                  ?: repository.currentFocusedItem()?.uid
                  ?: return@onEach
+             if (state == org.dhis2.sensor.ble.BleManager.ConnectionState.CONNECTED) {
+                 rememberConnectedDevice(fieldUid)
+             }
              val currentStatus = _sensorStatuses.value[fieldUid]
              val status = when(state) {
                  org.dhis2.sensor.ble.BleManager.ConnectionState.CONNECTED -> SensorStatusText.CONNECTED
@@ -296,6 +303,17 @@ class FormViewModel(
                  _sensorStatuses.update { it + (secUid to status) }
              }
         }.launchIn(viewModelScope)
+    }
+
+    private fun rememberConnectedDevice(fieldUid: String) {
+        val deviceType =
+            reconnectManager.resolveDeviceType(fieldUid, sensorConfigRepository) ?: return
+        val deviceAddress = bleManager.currentDeviceAddress.value ?: return
+        pairedDeviceRepository.markDeviceConnected(
+            deviceName = bleManager.currentDeviceName.value ?: deviceType.defaultDeviceName,
+            macAddress = deviceAddress,
+            deviceType = deviceType,
+        )
     }
 
     private fun displayResult(result: Pair<RowAction, StoreResult>) {
@@ -1285,8 +1303,14 @@ class FormViewModel(
         activeSensorFieldUid = primaryFieldUid
         secondarySensorFieldUid = secondaryFieldUid
         val sensorType = SensorFieldResolver.resolveSensorType(primaryFieldUid, sensorConfigRepository)
-        val preferredMacAddress =
+        val fallbackMacAddress =
             SensorFieldResolver.resolvePreferredMacAddress(primaryFieldUid, sensorConfigRepository)
+        val preferredMacAddress =
+            reconnectManager.resolvePreferredMacAddress(
+                fieldUid = primaryFieldUid,
+                sensorConfigRepository = sensorConfigRepository,
+                fallbackMacAddress = fallbackMacAddress,
+            )
         val initialStatus =
             if (preferredMacAddress != null) {
                 SensorStatusText.DIRECT_CONNECTING
@@ -1332,6 +1356,11 @@ class FormViewModel(
     }
 
     fun retakeSensorMeasurement(
+        primaryFieldUid: String,
+        secondaryFieldUid: String? = null,
+    ) = reconnectSensorDevice(primaryFieldUid, secondaryFieldUid)
+
+    fun reconnectSensorDevice(
         primaryFieldUid: String,
         secondaryFieldUid: String? = null,
     ) {

@@ -40,6 +40,9 @@ import org.dhis2.form.ui.provider.HintProviderImpl
 import org.dhis2.form.ui.provider.KeyboardActionProviderImpl
 import org.dhis2.form.ui.provider.LegendValueProviderImpl
 import org.dhis2.form.ui.provider.UiEventTypesProviderImpl
+import org.dhis2.sensors.device_manager.DeviceStorageManager
+import org.dhis2.sensors.device_manager.PairedDeviceRepository
+import org.dhis2.sensors.device_manager.ReconnectManager
 
 import org.dhis2.mobile.commons.customintents.CustomIntentRepository
 import org.dhis2.mobile.commons.customintents.CustomIntentRepositoryImpl
@@ -68,6 +71,8 @@ object Injector {
             provideDispatchers(),
             provideBleManager(context),
             provideSensorConfigRepository(context),
+            providePairedDeviceRepository(context),
+            provideReconnectManager(context),
             openErrorLocation,
             provideFormResultDialogProvider(context),
         )
@@ -306,4 +311,10 @@ object Injector {
 
     private fun provideBleManager(context: Context): org.dhis2.sensor.ble.BleManager =
         org.dhis2.sensor.ble.BleManager(context, provideSensorConfigRepository(context))
+
+    private fun providePairedDeviceRepository(context: Context): PairedDeviceRepository =
+        PairedDeviceRepository(DeviceStorageManager(context.applicationContext))
+
+    private fun provideReconnectManager(context: Context): ReconnectManager =
+        ReconnectManager(providePairedDeviceRepository(context))
 }

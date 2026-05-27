@@ -28,6 +28,9 @@ class BleManager(
     private val _sensorData = MutableStateFlow<List<Pair<String, String>>>(emptyList())
     val sensorData: StateFlow<List<Pair<String, String>>> = _sensorData.asStateFlow()
 
+    val currentDeviceAddress: StateFlow<String?> = delegate.currentDeviceAddress
+    val currentDeviceName: StateFlow<String?> = delegate.currentDeviceName
+
     init {
         delegate.connectionState
             .onEach { _connectionState.value = it.toLegacy() }

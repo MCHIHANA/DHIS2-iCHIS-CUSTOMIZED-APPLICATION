@@ -33,6 +33,10 @@
             android:icon="@drawable/ic_menu_vital_signs"
             android:title="@string/vital_signs_dashboard" />
         <item
+            android:id="@+id/menu_device_manager"
+            android:icon="@drawable/ic_menu_device_manager"
+            android:title="@string/device_manager" />
+        <item
             android:id="@+id/sync_manager"
             android:icon="@drawable/ic_menu_settings"
             android:title="@string/SYNC_MANAGER" />
