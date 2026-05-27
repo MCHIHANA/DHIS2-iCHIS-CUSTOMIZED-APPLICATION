@@ -287,9 +287,9 @@ fun SensorButtonWrapper(
                     style = MaterialTheme.typography.bodySmall,
                     color = when {
                         hasCompletedReading -> Color(0xFF4CAF50)
-                        sensorStatus?.contains("connected", ignoreCase = true) == true -> Color(0xFF4CAF50)
-                        sensorStatus?.contains("No connections", ignoreCase = true) == true -> Color(0xFFF44336)
-                        sensorStatus?.contains("denied", ignoreCase = true) == true -> Color(0xFFF44336)
+                        SensorStatusText.isConnected(sensorStatus) -> Color(0xFF4CAF50)
+                        SensorStatusText.isFailure(sensorStatus) ||
+                            sensorStatus?.contains("No connections", ignoreCase = true) == true -> Color(0xFFF44336)
                         else -> MaterialTheme.colorScheme.secondary
                     },
                     modifier = Modifier.padding(horizontal = Spacing.Spacing16, vertical = Spacing.Spacing4)

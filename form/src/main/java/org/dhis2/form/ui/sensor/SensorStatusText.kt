@@ -10,4 +10,15 @@ object SensorStatusText {
     const val DATA_RECEIVED_PREFIX = "Data received:"
 
     fun dataReceived(value: String): String = "$DATA_RECEIVED_PREFIX $value"
+
+    fun isCompleted(status: String?): Boolean =
+        status?.startsWith(DATA_RECEIVED_PREFIX, ignoreCase = true) == true
+
+    fun isConnected(status: String?): Boolean =
+        status?.contains("connected", ignoreCase = true) == true
+
+    fun isFailure(status: String?): Boolean =
+        status == NO_SENSOR_FOUND ||
+            status?.contains("denied", ignoreCase = true) == true ||
+            status?.startsWith("Error:", ignoreCase = true) == true
 }

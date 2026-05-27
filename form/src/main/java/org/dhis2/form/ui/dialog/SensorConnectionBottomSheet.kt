@@ -208,7 +208,8 @@ fun SensorConnectionScreen(
                             helperText = SensorStatusText.RETAKE_HINT,
                         )
 
-                    displayStatus == "No connections available" ->
+                    displayStatus == "No connections available" ||
+                        displayStatus == SensorStatusText.NO_SENSOR_FOUND ->
                         BluetoothSensorStatus(
                             status = SensorStatusText.NO_SENSOR_FOUND,
                             isSuccess = false,

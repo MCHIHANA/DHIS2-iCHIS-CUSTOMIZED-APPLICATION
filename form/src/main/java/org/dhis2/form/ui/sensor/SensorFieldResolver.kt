@@ -85,7 +85,7 @@ object SensorFieldResolver {
     }
 
     fun hasCompletedReading(status: String?): Boolean =
-        status?.startsWith(SensorStatusText.DATA_RECEIVED_PREFIX, ignoreCase = true) == true
+        SensorStatusText.isCompleted(status)
 
     private fun resolveSecondaryFromLabels(
         uid: String,
