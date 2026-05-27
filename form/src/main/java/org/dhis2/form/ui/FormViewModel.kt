@@ -1344,19 +1344,9 @@ class FormViewModel(
     private fun shouldRefreshVitalDashboard(fieldUid: String): Boolean =
         fieldUid == EVENT_REPORT_DATE_UID ||
             sensorConfigRepository.getConfigByDataElement(fieldUid) != null ||
-            fieldUid in vitalDashboardFieldUids
+            fieldUid in SensorFieldResolver.knownSensorFieldUids
 
     companion object {
         const val TAG = "FormViewModel"
-
-        private val vitalDashboardFieldUids =
-            setOf(
-                "KXNH45ts16S",
-                "VqwQWWDmYLn",
-                "tZbUrUbhUNy",
-                "S7OjKl85YSh",
-                "HkfzcXMdLLF",
-                "BaGxiB8AsNI",
-            )
     }
 }
