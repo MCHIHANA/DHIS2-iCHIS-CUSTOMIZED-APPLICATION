@@ -15,8 +15,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import org.dhis2.usescases.vitaldashboard.AlertType
 import org.dhis2.usescases.vitaldashboard.VitalAlert
-import java.text.SimpleDateFormat
-import java.util.*
 
 /**
  * Alerts Tab Content
@@ -31,6 +29,8 @@ fun AlertsTabContent(
     onPatientClick: (String) -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val now = rememberDashboardClock()
+
     if (alerts.isEmpty()) {
         Box(
             modifier = modifier.fillMaxSize(),
@@ -66,6 +66,7 @@ fun AlertsTabContent(
             items(alerts) { alert ->
                 AlertCard(
                     alert = alert,
+                    now = now,
                     onClick = { onPatientClick(alert.patientUid) }
                 )
             }
@@ -76,6 +77,7 @@ fun AlertsTabContent(
 @Composable
 fun AlertCard(
     alert: VitalAlert,
+    now: Long,
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -115,7 +117,12 @@ fun AlertCard(
                     style = MaterialTheme.typography.bodyMedium
                 )
                 Text(
-                    text = formatAlertTime(alert.timestamp),
+                    text = "Taken: ${formatDashboardTimestamp(alert.timestamp)}",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Text(
+                    text = "Freshness: ${formatReadingFreshness(alert.timestamp, now)}",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -229,14 +236,3 @@ private fun getAlertIcon(alertType: AlertType): androidx.compose.ui.graphics.vec
     }
 }
 
-private fun formatAlertTime(timestamp: Long): String {
-    val now = System.currentTimeMillis()
-    val diff = now - timestamp
-    
-    return when {
-        diff < 60_000 -> "Just now"
-        diff < 3600_000 -> "${diff / 60_000}m ago"
-        diff < 86400_000 -> "${diff / 3600_000}h ago"
-        else -> SimpleDateFormat("MMM dd, HH:mm", Locale.getDefault()).format(Date(timestamp))
-    }
-}
