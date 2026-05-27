@@ -18,8 +18,6 @@ import org.junit.Before
 import org.junit.Test
 import org.mockito.kotlin.doReturn
 import org.mockito.kotlin.mock
-import org.mockito.kotlin.times
-import org.mockito.kotlin.verify
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class VitalDashboardViewModelTest {
@@ -101,7 +99,7 @@ class VitalDashboardViewModelTest {
 
     @Test
     fun `should refresh dashboard data when refresh bus emits`() {
-        val dashboardData =
+        val initialData =
             VitalDashboardData(
                 patientSummaries = emptyList(),
                 recentMeasurements = emptyList(),
@@ -116,21 +114,54 @@ class VitalDashboardViewModelTest {
                     ),
                 trends = emptyMap(),
             )
+        val refreshedData =
+            VitalDashboardData(
+                patientSummaries =
+                    listOf(
+                        PatientVitalSummary(
+                            patientUid = "patient-2",
+                            patientName = "John Doe",
+                            age = 29,
+                            gender = "Male",
+                            latestVitals =
+                                mapOf(
+                                    VitalSignType.TEMPERATURE to VitalValue("36.8", "C", 36.8f),
+                                ),
+                            hasAlerts = false,
+                            lastMeasurementTime = 2L,
+                            lastUpdatedTime = 3L,
+                        ),
+                    ),
+                recentMeasurements = emptyList(),
+                alerts = emptyList(),
+                statistics =
+                    VitalStatistics(
+                        totalPatients = 1,
+                        totalMeasurements = 1,
+                        activeAlerts = 0,
+                        measurementsToday = 1,
+                        averagesByType = emptyMap(),
+                    ),
+                trends = emptyMap(),
+            )
 
         repository =
             mock {
                 onBlocking { isUserAuthorized() } doReturn true
-                onBlocking { getDashboardData(VitalDashboardFilter()) } doReturn dashboardData
+                onBlocking { getDashboardData(VitalDashboardFilter()) } doReturn initialData doReturn refreshedData
             }
 
-        buildViewModel()
+        val viewModel = buildViewModel()
         testDispatcher.scheduler.advanceUntilIdle()
+        assertEquals(VitalDashboardUiState.Empty, viewModel.uiState.value)
 
         VitalDashboardRefreshBus.notifyRefresh()
         testDispatcher.scheduler.advanceTimeBy(400)
         testDispatcher.scheduler.advanceUntilIdle()
 
-        verify(repository, times(2)).getDashboardData(VitalDashboardFilter())
+        assertTrue(viewModel.uiState.value is VitalDashboardUiState.Success)
+        val successState = viewModel.uiState.value as VitalDashboardUiState.Success
+        assertEquals("John Doe", successState.data.patientSummaries.first().patientName)
     }
 
     private fun buildViewModel() =
