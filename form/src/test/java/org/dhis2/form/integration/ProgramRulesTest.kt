@@ -34,6 +34,8 @@ import org.dhis2.form.ui.intent.FormIntent
 import org.dhis2.form.ui.provider.FormResultDialogProvider
 import org.dhis2.sensor.ble.BleManager
 import org.dhis2.sensor.config.SensorConfigRepository
+import org.dhis2.sensors.device_manager.PairedDeviceRepository
+import org.dhis2.sensors.device_manager.ReconnectManager
 import org.dhis2.mobileProgramRules.RuleEngineHelper
 import org.hisp.dhis.android.core.D2
 import org.hisp.dhis.android.core.common.ValueType
@@ -66,6 +68,8 @@ class ProgramRulesTest {
             on { connectionState } doReturn MutableStateFlow(BleManager.ConnectionState.DISCONNECTED)
         }
     private val sensorConfigRepository: SensorConfigRepository = mock()
+    private val pairedDeviceRepository: PairedDeviceRepository = mock()
+    private val reconnectManager: ReconnectManager = mock()
     private val optionRepository: OptionsRepository = mock()
     private val formValueStore: FormValueStore = mock()
 
@@ -151,6 +155,8 @@ class ProgramRulesTest {
                 },
                 bleManager = bleManager,
                 sensorConfigRepository = sensorConfigRepository,
+                pairedDeviceRepository = pairedDeviceRepository,
+                reconnectManager = reconnectManager,
                 geometryController = geometryController,
                 resultDialogUiProvider = resultDialogUiProvider,
             )

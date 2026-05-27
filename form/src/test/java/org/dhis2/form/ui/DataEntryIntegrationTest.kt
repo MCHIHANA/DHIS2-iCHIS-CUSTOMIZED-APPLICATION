@@ -37,6 +37,8 @@ import org.dhis2.mobile.commons.model.MetadataIconData
 import org.dhis2.mobile.commons.providers.FieldErrorMessageProvider
 import org.dhis2.sensor.ble.BleManager
 import org.dhis2.sensor.config.SensorConfigRepository
+import org.dhis2.sensors.device_manager.PairedDeviceRepository
+import org.dhis2.sensors.device_manager.ReconnectManager
 import org.dhis2.mobileProgramRules.RuleEngineHelper
 import org.hisp.dhis.android.core.common.ValueType
 import org.hisp.dhis.android.core.option.Option
@@ -68,6 +70,8 @@ class DataEntryIntegrationTest {
             on { connectionState } doReturn MutableStateFlow(BleManager.ConnectionState.DISCONNECTED)
         }
     private val sensorConfigRepository: SensorConfigRepository = mock()
+    private val pairedDeviceRepository: PairedDeviceRepository = mock()
+    private val reconnectManager: ReconnectManager = mock()
     private val geometryController: GeometryController = mock()
     private val preferenceProvider: PreferenceProvider = mock()
 
@@ -172,6 +176,8 @@ class DataEntryIntegrationTest {
                 dispatcher = dispatcher,
                 bleManager = bleManager,
                 sensorConfigRepository = sensorConfigRepository,
+                pairedDeviceRepository = pairedDeviceRepository,
+                reconnectManager = reconnectManager,
                 geometryController = geometryController,
                 openErrorLocation = false,
                 resultDialogUiProvider = resultDialogUiProvider,
