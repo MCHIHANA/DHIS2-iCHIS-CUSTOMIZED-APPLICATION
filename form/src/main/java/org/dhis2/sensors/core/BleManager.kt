@@ -89,6 +89,15 @@ class BleManager(
             preferredDeviceAddress?.uppercase()
                 ?: deviceCache.get(preferredSensorType)
 
+        if (
+            cachedAddress != null &&
+            _connectionState.value == ConnectionState.CONNECTED &&
+            _currentDeviceAddress.value.equals(cachedAddress, ignoreCase = true)
+        ) {
+            SensorLogger.d(TAG, "Already connected to preferred device $cachedAddress")
+            return
+        }
+
         if (cachedAddress != null && tryDirectReconnect(cachedAddress, preferredSensorType)) {
             return
         }
@@ -202,7 +211,7 @@ class BleManager(
             preferredTargetAddress = preferredAddress,
             onDeviceFound = { device ->
                 val currentDevices = _devices.value.toMutableList()
-                if (!currentDevices.contains(device)) {
+                if (currentDevices.none { it.address.equals(device.address, ignoreCase = true) }) {
                     currentDevices.add(device)
                     _devices.value = currentDevices
                     SensorLogger.d(TAG, "Device found: ${device.name ?: "Unknown"} (${device.address})")
@@ -261,8 +270,8 @@ class BleManager(
 
     private companion object {
         const val TAG = "BleManager"
-        const val DIRECT_RECONNECT_TIMEOUT_MS = 8_000L
-        const val SCAN_RECOVERY_DELAY_MS = 700L
+        const val DIRECT_RECONNECT_TIMEOUT_MS = 4_500L
+        const val SCAN_RECOVERY_DELAY_MS = 400L
         const val MAX_SCAN_RECOVERY_RETRIES = 2
     }
 }

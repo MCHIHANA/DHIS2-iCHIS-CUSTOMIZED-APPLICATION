@@ -74,6 +74,9 @@ class BleConnector(
             when (newState) {
                 BluetoothProfile.STATE_CONNECTED -> {
                     SensorLogger.d(TAG_CONNECT, "Connected to ${gatt.device.address}")
+                    runCatching {
+                        gatt.requestConnectionPriority(BluetoothGatt.CONNECTION_PRIORITY_HIGH)
+                    }
                     onConnectionStateChanged(true)
                     gatt.discoverServices()
                 }

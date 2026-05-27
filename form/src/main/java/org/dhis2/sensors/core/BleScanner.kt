@@ -8,6 +8,7 @@ import android.bluetooth.le.ScanCallback
 import android.bluetooth.le.ScanResult
 import android.bluetooth.le.ScanSettings
 import android.content.Context
+import android.os.Build
 import org.dhis2.sensors.devices.bloodpressure.BloodPressureConstants
 import org.dhis2.sensors.devices.spo2.Spo2Constants
 import org.dhis2.sensors.devices.temperature.TemperatureConstants
@@ -51,9 +52,14 @@ class BleScanner(
         }
 
         seenDevices.clear()
-        val settings = ScanSettings.Builder()
+        val settingsBuilder = ScanSettings.Builder()
             .setScanMode(ScanSettings.SCAN_MODE_LOW_LATENCY)
-            .build()
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            settingsBuilder
+                .setMatchMode(ScanSettings.MATCH_MODE_AGGRESSIVE)
+                .setNumOfMatches(ScanSettings.MATCH_NUM_MAX_ADVERTISEMENT)
+        }
+        val settings = settingsBuilder.build()
 
         val callback = object : ScanCallback() {
             override fun onScanResult(
