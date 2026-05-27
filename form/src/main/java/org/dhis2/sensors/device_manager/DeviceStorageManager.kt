@@ -13,15 +13,37 @@ class DeviceStorageManager(context: Context) {
     fun loadDevices(): List<SensorDevice> {
         val json = sharedPreferences.getString(KEY_PAIRED_DEVICES, null) ?: return emptyList()
         return runCatching {
-            gson.fromJson<List<SensorDevice>>(json, deviceListType).orEmpty()
+            gson.fromJson<List<SensorDevice>>(json, deviceListType)
+                .orEmpty()
+                .normalized()
         }.getOrDefault(emptyList())
     }
 
     fun saveDevices(devices: List<SensorDevice>) {
         sharedPreferences.edit()
-            .putString(KEY_PAIRED_DEVICES, gson.toJson(devices))
+            .putString(KEY_PAIRED_DEVICES, gson.toJson(devices.normalized()))
             .apply()
     }
+
+    private fun List<SensorDevice>.normalized(): List<SensorDevice> =
+        filter { it.macAddress.isNotBlank() }
+            .groupBy { it.macAddress.uppercase() }
+            .map { (normalizedAddress, duplicates) ->
+                duplicates
+                    .maxWithOrNull(
+                        compareBy<SensorDevice> { it.lastConnected }
+                            .thenBy { if (it.deviceName.isBlank()) 0 else 1 },
+                    )
+                    ?.copy(
+                        deviceName =
+                            duplicates
+                                .firstOrNull { it.deviceName.isNotBlank() }
+                                ?.deviceName
+                                ?: duplicates.first().deviceType.defaultDeviceName,
+                        macAddress = normalizedAddress,
+                    )
+            }
+            .filterNotNull()
 
     private companion object {
         const val PREFERENCES_NAME = "device_manager_preferences"

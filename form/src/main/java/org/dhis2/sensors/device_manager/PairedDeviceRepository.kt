@@ -14,13 +14,19 @@ class PairedDeviceRepository(
         _devices.value = loadSortedDevices()
     }
 
-    fun getPreferredDevice(deviceType: DeviceType): SensorDevice? =
-        _devices.value
+    fun getPreferredDevice(deviceType: DeviceType): SensorDevice? {
+        refresh()
+        return _devices.value
             .filter { it.deviceType == deviceType && it.isPaired }
             .maxByOrNull { it.lastConnected }
+    }
 
-    fun findDevice(macAddress: String): SensorDevice? =
-        _devices.value.firstOrNull { it.macAddress.equals(macAddress, ignoreCase = true) }
+    fun findDevice(macAddress: String): SensorDevice? {
+        refresh()
+        return _devices.value.firstOrNull {
+            it.macAddress.equals(macAddress.normalizedMacAddress(), ignoreCase = true)
+        }
+    }
 
     fun pairDevice(
         deviceName: String,
@@ -28,9 +34,9 @@ class PairedDeviceRepository(
         deviceType: DeviceType,
         lastConnected: Long = findDevice(macAddress)?.lastConnected ?: 0L,
     ) {
-        val normalizedAddress = macAddress.uppercase()
+        val normalizedAddress = macAddress.normalizedMacAddress()
         val updatedDevices =
-            _devices.value
+            loadSortedDevices()
                 .filterNot { it.macAddress.equals(normalizedAddress, ignoreCase = true) }
                 .plus(
                     SensorDevice(
@@ -60,9 +66,10 @@ class PairedDeviceRepository(
     }
 
     fun removeDevice(macAddress: String) {
+        val normalizedAddress = macAddress.normalizedMacAddress()
         persist(
-            _devices.value
-                .filterNot { it.macAddress.equals(macAddress, ignoreCase = true) }
+            loadSortedDevices()
+                .filterNot { it.macAddress.equals(normalizedAddress, ignoreCase = true) }
                 .sortedWith(deviceComparator),
         )
     }
@@ -74,6 +81,8 @@ class PairedDeviceRepository(
 
     private fun loadSortedDevices(): List<SensorDevice> =
         storageManager.loadDevices().sortedWith(deviceComparator)
+
+    private fun String.normalizedMacAddress(): String = trim().uppercase()
 
     private companion object {
         val deviceComparator =
