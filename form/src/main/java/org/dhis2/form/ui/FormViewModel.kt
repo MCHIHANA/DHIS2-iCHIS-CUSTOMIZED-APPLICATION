@@ -272,7 +272,7 @@ class FormViewModel(
                  ?: repository.currentFocusedItem()?.uid
                  ?: return@onEach
              val status = when(state) {
-                 org.dhis2.sensor.ble.BleManager.ConnectionState.CONNECTED -> "Connected - Place finger on sensor now!"
+                 org.dhis2.sensor.ble.BleManager.ConnectionState.CONNECTED -> "Blood pressure sensor connected. Waiting for readings..."
                  org.dhis2.sensor.ble.BleManager.ConnectionState.CONNECTING -> "Connecting to sensor..."
                  org.dhis2.sensor.ble.BleManager.ConnectionState.DISCONNECTED -> "Disconnected"
                  org.dhis2.sensor.ble.BleManager.ConnectionState.DISCONNECTING -> "Disconnecting..."
