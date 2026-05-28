@@ -39,6 +39,14 @@ class EnrollmentConfiguration(
 
     fun trackedEntityType() = d2.trackedEntityType(program()?.trackedEntityType()?.uid()!!)
 
+    fun trackedEntityTypeAttributes() =
+        d2
+            .trackedEntityModule()
+            .trackedEntityTypeAttributes()
+            .byTrackedEntityTypeUid()
+            .eq(trackedEntityType()?.uid())
+            .blockingGet()
+
     fun sections() =
         d2
             .programModule()

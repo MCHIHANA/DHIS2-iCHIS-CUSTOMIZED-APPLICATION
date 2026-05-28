@@ -146,9 +146,11 @@ class EnrollmentRepository(
 
     private fun getFieldsForSingleSection(): Single<List<FieldUiModel>> =
         Single.fromCallable {
-            conf.programAttributes().map { programTrackedEntityAttribute ->
-                transform(programTrackedEntityAttribute)
-            }
+            conf
+                .programAttributes()
+                .map { programTrackedEntityAttribute ->
+                    transform(programTrackedEntityAttribute)
+                }.withEnrollmentDemographics()
         }
 
     private fun getFieldsForMultipleSections(): Single<List<FieldUiModel>> {
@@ -164,8 +166,193 @@ class EnrollmentRepository(
                     }
                 }
             }
-            return@fromCallable fields
+            return@fromCallable fields.withEnrollmentDemographics()
         }
+    }
+
+    private fun List<FieldUiModel>.withEnrollmentDemographics(): List<FieldUiModel> {
+        val fields = withRequiredDemographicFields()
+        val missingFields = fields.missingDemographicFields()
+        if (missingFields.isEmpty()) return fields
+
+        val insertionIndex = fields.indexOfLast { isFullNameField(it) }
+        val insertionSectionUid =
+            insertionIndex
+                .takeIf { it >= 0 }
+                ?.let { fields[it].programStageSection }
+                ?: fields.lastOrNull { it.valueType != null }?.programStageSection
+                ?: SINGLE_SECTION_UID
+        val fieldsToInsert =
+            missingFields.map { createDemographicField(it, insertionSectionUid) }
+
+        return if (insertionIndex >= 0) {
+            fields
+                .toMutableList()
+                .apply { addAll(insertionIndex + 1, fieldsToInsert) }
+        } else {
+            fields + fieldsToInsert
+        }
+    }
+
+    private fun List<FieldUiModel>.withRequiredDemographicFields(): List<FieldUiModel> =
+        map { field ->
+            if (EnrollmentDemographics.isAgeField(field) || EnrollmentDemographics.isGenderField(field)) {
+                field.setFieldMandatory()
+            } else {
+                field
+            }
+        }
+
+    private fun List<FieldUiModel>.missingDemographicFields(): List<DemographicField> {
+        val existingUids = map { it.uid }.toSet()
+        val demographicFields = mutableListOf<DemographicField>()
+
+        if (none { EnrollmentDemographics.isAgeField(it) }) {
+            findDemographicAttribute(
+                existingUids = existingUids,
+                tokens = setOf("age"),
+                supportedValueType = { valueType ->
+                    valueType == ValueType.TEXT ||
+                        valueType?.isNumeric == true ||
+                        valueType?.isInteger == true
+                },
+            )?.let { demographicFields.add(DemographicField.Age(it)) }
+        }
+
+        if (none { EnrollmentDemographics.isGenderField(it) }) {
+            findDemographicAttribute(
+                existingUids = existingUids + demographicFields.map { it.attribute.uid() },
+                tokens = setOf("gender", "sex"),
+                supportedValueType = { valueType ->
+                    valueType == ValueType.TEXT ||
+                        valueType == ValueType.MULTI_TEXT ||
+                        valueType?.isText == true
+                },
+            )?.let { demographicFields.add(DemographicField.Gender(it)) }
+        }
+
+        return demographicFields
+    }
+
+    private fun createDemographicField(
+        demographicField: DemographicField,
+        sectionUid: String,
+    ): FieldUiModel =
+        when (demographicField) {
+            is DemographicField.Age -> createAgeField(demographicField.attribute, sectionUid)
+            is DemographicField.Gender -> createGenderField(demographicField.attribute, sectionUid)
+        }
+
+    private fun createAgeField(
+        attribute: TrackedEntityAttribute,
+        sectionUid: String,
+    ): FieldUiModel =
+        fieldFactory.create(
+            attribute.uid(),
+            attribute.displayFormName()?.takeIf { it.isNotBlank() } ?: "Age",
+            ValueType.INTEGER_ZERO_OR_POSITIVE,
+            true,
+            null,
+            getAttributeValue(attribute.uid()),
+            sectionUid,
+            false,
+            canBeEdited(),
+            null,
+            attribute.displayDescription(),
+            null,
+            attribute.style() ?: ObjectStyle.builder().build(),
+            EnrollmentDemographics.AGE_FIELD_MASK,
+            null,
+            null,
+        )
+
+    private fun createGenderField(
+        attribute: TrackedEntityAttribute,
+        sectionUid: String,
+    ): FieldUiModel {
+        val optionSetUid = attribute.optionSet()?.uid()
+        val optionSetConfiguration =
+            optionSetUid
+                ?.takeIf { it.isNotBlank() }
+                ?.let(::optionSetConfiguration)
+                ?: EnrollmentDemographics.genderOptionSetConfiguration()
+
+        return fieldFactory.create(
+            attribute.uid(),
+            attribute.displayFormName()?.takeIf { it.isNotBlank() } ?: "Gender",
+            ValueType.TEXT,
+            true,
+            optionSetUid ?: EnrollmentDemographics.GENDER_OPTION_SET_UID,
+            getAttributeValue(attribute.uid()),
+            sectionUid,
+            false,
+            canBeEdited(),
+            null,
+            attribute.displayDescription(),
+            null,
+            attribute.style() ?: ObjectStyle.builder().build(),
+            null,
+            optionSetConfiguration,
+            null,
+        )
+    }
+
+    private fun optionSetConfiguration(optionSetUid: String): OptionSetConfiguration {
+        val (searchEmitter, optionFlow) =
+            options(
+                optionSetUid = optionSetUid,
+                optionsToHide = emptyList(),
+                optionGroupsToHide = emptyList(),
+                optionGroupsToShow = emptyList(),
+            )
+        return OptionSetConfiguration(
+            searchEmitter = searchEmitter,
+            optionFlow = optionFlow,
+            onSearch = { searchEmitter.value = it },
+        )
+    }
+
+    private fun getAttributeValue(attributeUid: String): String? =
+        runCatching {
+            conf.attributeValue(attributeUid)
+        }.getOrNull()
+
+    private fun findDemographicAttribute(
+        existingUids: Set<String>,
+        tokens: Set<String>,
+        supportedValueType: (ValueType?) -> Boolean,
+    ): TrackedEntityAttribute? =
+        runCatching { conf.trackedEntityTypeAttributes() }
+            .getOrDefault(emptyList())
+            .mapNotNull { it.trackedEntityAttribute()?.uid() }
+            .filterNot { it in existingUids }
+            .mapNotNull { attributeUid ->
+                runCatching { conf.trackedEntityAttribute(attributeUid) }.getOrNull()
+            }.firstOrNull { attribute ->
+                supportedValueType(attribute.valueType()) &&
+                    listOf(
+                        attribute.displayFormName(),
+                        attribute.displayName(),
+                        attribute.name(),
+                        attribute.code(),
+                    ).any { EnrollmentDemographics.matchesAnyToken(it, tokens) }
+            }
+
+    private fun isFullNameField(field: FieldUiModel): Boolean {
+        val normalizedLabel =
+            field.label
+                .lowercase()
+                .replace(Regex("[^a-z0-9]+"), " ")
+                .trim()
+        return normalizedLabel == "full name" || normalizedLabel == "fullname"
+    }
+
+    private sealed class DemographicField(
+        val attribute: TrackedEntityAttribute,
+    ) {
+        class Age(attribute: TrackedEntityAttribute) : DemographicField(attribute)
+
+        class Gender(attribute: TrackedEntityAttribute) : DemographicField(attribute)
     }
 
     private fun transform(
