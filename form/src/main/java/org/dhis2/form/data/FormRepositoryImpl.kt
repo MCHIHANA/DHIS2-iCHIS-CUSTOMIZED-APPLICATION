@@ -480,30 +480,7 @@ class FormRepositoryImpl(
                         message = errorField.errorMessage,
                     )
                 } ?: emptyList(),
-            ).plus(
-                getDemographicFieldErrors(),
             )
-
-    private fun getDemographicFieldErrors(): List<FieldWithIssue> {
-        if (dataEntryRepository.isEvent()) return emptyList()
-
-        val existingErrorUids = itemsWithError.map { it.id }.toSet()
-        return itemList
-            .filterNot { it.uid in existingErrorUids }
-            .mapNotNull { field ->
-                EnrollmentDemographics
-                    .validateAge(field.value)
-                    ?.takeIf { EnrollmentDemographics.isAgeField(field) }
-                    ?.let { message ->
-                        FieldWithIssue(
-                            fieldUid = field.uid,
-                            fieldName = field.label,
-                            issueType = IssueType.ERROR,
-                            message = message,
-                        )
-                    }
-            }
-    }
 
     @Synchronized
     private fun List<FieldUiModel>.applyRuleEffects(skipProgramRules: Boolean = false): List<FieldUiModel> {
@@ -655,20 +632,11 @@ class FormRepositoryImpl(
             mandatoryItemsWithoutValue[fieldUiModel.label] = fieldUiModel.programStageSection ?: ""
         }
 
-        val ageValidationMessage =
-            EnrollmentDemographics
-                .validateAge(fieldUiModel.value)
-                ?.takeIf {
-                    runDataIntegrity &&
-                        !dataEntryRepository.isEvent() &&
-                        EnrollmentDemographics.isAgeField(fieldUiModel)
-                }
-
         return dataEntryRepository.updateField(
             fieldUiModel,
             fieldErrorMessageProvider.mandatoryWarning().takeIf {
                 needsMandatoryWarning && runDataIntegrity
-            } ?: ageValidationMessage,
+            },
             ruleEffectsResult?.optionsToHide(fieldUiModel.uid) ?: emptyList(),
             ruleEffectsResult?.optionGroupsToHide(fieldUiModel.uid) ?: emptyList(),
             ruleEffectsResult?.optionGroupsToShow(fieldUiModel.uid) ?: emptyList(),
@@ -867,8 +835,6 @@ class FormRepositoryImpl(
         uid: String,
         optionSetUid: String,
     ) {
-        if (EnrollmentDemographics.isSyntheticGenderOptionSet(optionSetUid)) return
-
         val (searchEmitter, flow) =
             dataEntryRepository.options(
                 optionSetUid = optionSetUid,
